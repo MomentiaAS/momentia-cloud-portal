@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS custom properties for semantic colour tokens ── */
+@layer base {
+  :root {
+    /* Light mode */
+    --color-surface:         241 245 249;   /* slate-100 */
+    --color-surface-raised:  255 255 255;
+    --color-surface-overlay: 248 250 252;   /* slate-50 */
+    --color-border:          226 232 240;   /* slate-200 */
+    --color-border-strong:   203 213 225;   /* slate-300 */
+    --color-text-primary:    15  23  42;    /* slate-900 */
+    --color-text-secondary:  71  85 105;    /* slate-600 */
+    --color-text-muted:      148 163 184;   /* slate-400 */
+
+    --sidebar-width: 240px;
+    --topbar-height: 56px;
+  }
+
+  .dark {
+    --color-surface:         15  23  42;    /* slate-900 */
+    --color-surface-raised:  30  41  59;    /* slate-800  (primary) */
+    --color-surface-overlay: 51  65  85;    /* slate-700 */
+    --color-border:          51  65  85;    /* slate-700 */
+    --color-border-strong:   71  85 105;    /* slate-600 */
+    --color-text-primary:    241 245 249;   /* slate-100 */
+    --color-text-secondary:  148 163 184;   /* slate-400 */
+    --color-text-muted:      100 116 139;   /* slate-500 */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-surface text-text-primary font-sans antialiased;
+    min-height: 100dvh;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary-300 dark:bg-primary-700 rounded-full;
+  }
+}
+
+@layer components {
+  /* Focus ring */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    @apply bg-primary-200 dark:bg-primary-700 rounded animate-pulse;
+  }
+
+  /* Nav pill active */
+  .nav-pill-active {
+    @apply bg-accent/10 dark:bg-accent/15 text-accent font-medium;
+  }
+}

@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { CheckCircle2, AlertTriangle, XCircle, Clock, X } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Clock, X, RefreshCw, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { demoBackupJobs, demoCustomers } from '../../data/demo';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { useBackupJobs } from '../../hooks/useBackupJobs';
+import { useCustomers } from '../../hooks/useCustomers';
 import type { BackupJob } from '../../types';
 import { cn } from '../../components/ui/cn';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -34,11 +36,9 @@ const statusBadge: Record<JobStatus, React.ComponentProps<typeof Badge>['variant
   idle:    'default',
 };
 
-function customerName(id: string) {
-  return demoCustomers.find(c => c.id === id)?.name ?? id;
-}
+// customerName resolved inside component via hook — see below
 
-function JobDrawer({ job, onClose }: { job: BackupJob; onClose: () => void }) {
+function JobDrawer({ job, onClose, customerName }: { job: BackupJob; onClose: () => void; customerName: (id: string) => string }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
@@ -94,19 +94,37 @@ function JobDrawer({ job, onClose }: { job: BackupJob; onClose: () => void }) {
 }
 
 export function BackupPage() {
+  const { jobs, loading, error, reload } = useBackupJobs();
+  const { customers } = useCustomers();
   const [selectedJob, setSelectedJob] = useState<BackupJob | null>(null);
 
-  const failed   = demoBackupJobs.filter(j => j.status === 'failed').length;
-  const warnings = demoBackupJobs.filter(j => j.status === 'warning').length;
-  const success  = demoBackupJobs.filter(j => j.status === 'success').length;
+  const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? id;
+
+  const failed   = jobs.filter(j => j.status === 'failed').length;
+  const warnings = jobs.filter(j => j.status === 'warning').length;
+  const success  = jobs.filter(j => j.status === 'success').length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Backup</h1>
-        <p className="text-sm text-text-secondary mt-0.5">Veeam job overview across all customers.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Backup</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Veeam job overview across all customers.</p>
+        </div>
+        <Button variant="ghost" size="icon" onClick={reload} aria-label="Refresh" disabled={loading}>
+          <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+          <AlertCircle className="size-4 shrink-0" />{error}
+          <Button variant="ghost" size="sm" onClick={reload} className="ml-auto">Retry</Button>
+        </div>
+      )}
+
+      {loading && !error && <SkeletonCard />}
 
       {/* Summary tiles */}
       <div className="grid grid-cols-3 gap-4">
@@ -130,7 +148,7 @@ export function BackupPage() {
 
       {/* Jobs list */}
       <Card>
-        <CardHeader title="Backup Jobs" subtitle={`${demoBackupJobs.length} jobs`} />
+        <CardHeader title="Backup Jobs" subtitle={`${jobs.length} jobs`} />
         <CardBody>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -150,7 +168,7 @@ export function BackupPage() {
                 </tr>
               </thead>
               <tbody>
-                {demoBackupJobs.map(job => {
+                {jobs.map(job => {
                   const Icon = statusIcon[job.status];
                   return (
                     <tr
@@ -197,7 +215,7 @@ export function BackupPage() {
 
       {/* Job detail drawer */}
       {selectedJob && (
-        <JobDrawer job={selectedJob} onClose={() => setSelectedJob(null)} />
+        <JobDrawer job={selectedJob} onClose={() => setSelectedJob(null)} customerName={customerName} />
       )}
     </div>
   );

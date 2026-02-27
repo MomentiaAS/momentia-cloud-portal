@@ -3,27 +3,9 @@ import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import type { Customer, ServiceTier, CustomerStatus } from '../../types';
+import type { CustomerFormPayload } from '../../hooks/useCustomers';
 
-type FormData = {
-  name:          string;
-  status:        CustomerStatus;
-  tier:          ServiceTier;
-  domain:        string;
-  address:       string;
-  assignedTech:  string;
-  contactName:   string;
-  contactEmail:  string;
-  contactPhone:  string;
-  contactRole:   string;
-  notes:         string;
-  veeam:         boolean;
-  rmm:           boolean;
-  m365:          boolean;
-  azure:         boolean;
-  sentinelOne:   boolean;
-};
-
-const DEFAULT: FormData = {
+const DEFAULT: CustomerFormPayload = {
   name: '', status: 'active', tier: 'standard',
   domain: '', address: '', assignedTech: '',
   contactName: '', contactEmail: '', contactPhone: '', contactRole: '',
@@ -34,14 +16,14 @@ const DEFAULT: FormData = {
 const TECHS = ['Alice Hartman', 'Marco Rivera', 'Priya Nair', 'Unassigned'];
 
 interface CustomerFormProps {
-  open:      boolean;
-  onClose:   () => void;
-  onSave:    (data: FormData) => void;
-  initial?:  Customer | null;
+  open:     boolean;
+  onClose:  () => void;
+  onSave:   (data: CustomerFormPayload) => Promise<void>;
+  initial?: Customer | null;
 }
 
 export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormProps) {
-  const [form, setForm] = useState<FormData>(() => {
+  const [form, setForm]   = useState<CustomerFormPayload>(() => {
     if (!initial) return DEFAULT;
     return {
       name:         initial.name,
@@ -63,7 +45,9 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
     };
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [errors,  setErrors]  = useState<Partial<Record<keyof CustomerFormPayload, string>>>({});
+  const [saving,  setSaving]  = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   function validate(): boolean {
     const e: typeof errors = {};
@@ -75,14 +59,24 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
     return Object.keys(e).length === 0;
   }
 
-  function handleSave() {
-    if (validate()) { onSave(form); onClose(); }
+  async function handleSave() {
+    if (!validate()) return;
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      await onSave(form);
+      onClose();
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
+  const set = <K extends keyof CustomerFormPayload>(key: K, val: CustomerFormPayload[K]) =>
     setForm(prev => ({ ...prev, [key]: val }));
 
-  const Toggle = ({ label, field }: { label: string; field: keyof FormData }) => (
+  const Toggle = ({ label, field }: { label: string; field: keyof CustomerFormPayload }) => (
     <label className="flex items-center gap-2 cursor-pointer select-none">
       <input
         type="checkbox"
@@ -102,14 +96,20 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
       size="lg"
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleSave}>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="primary" onClick={handleSave} loading={saving}>
             {initial ? 'Save Changes' : 'Add Customer'}
           </Button>
         </>
       }
     >
       <div className="space-y-6">
+        {saveErr && (
+          <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+            {saveErr}
+          </div>
+        )}
+
         {/* Identity */}
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">Identity</h3>

@@ -1,10 +1,11 @@
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card';
-import { demoCustomers } from '../../../data/demo';
+import { useCustomers } from '../../../hooks/useCustomers';
 import { cn } from '../../../components/ui/cn';
 
 export function EnvironmentStatusCard({ className }: { className?: string }) {
-  const active = demoCustomers.filter(c => c.status === 'active');
+  const { customers, loading } = useCustomers();
+  const active   = customers.filter(c => c.status === 'active');
   const healthy  = active.filter(c => c.health === 'healthy').length;
   const degraded = active.filter(c => c.health === 'degraded').length;
   const critical = active.filter(c => c.health === 'critical').length;
@@ -17,7 +18,10 @@ export function EnvironmentStatusCard({ className }: { className?: string }) {
 
   return (
     <Card className={cn(className)}>
-      <CardHeader title="Environment Status" subtitle={`${active.length} active customers`} />
+      <CardHeader
+        title="Environment Status"
+        subtitle={loading ? 'Loading…' : `${active.length} active customers`}
+      />
       <CardBody>
         <div className="grid grid-cols-3 gap-3">
           {stats.map(s => {
@@ -25,7 +29,9 @@ export function EnvironmentStatusCard({ className }: { className?: string }) {
             return (
               <div key={s.label} className={cn('rounded-lg p-3 flex flex-col items-center gap-1', s.bg)}>
                 <Icon className={cn('size-5', s.color)} />
-                <span className={cn('text-2xl font-bold tabular-nums', s.color)}>{s.value}</span>
+                <span className={cn('text-2xl font-bold tabular-nums', s.color)}>
+                  {loading ? '–' : s.value}
+                </span>
                 <span className="text-xs text-text-muted">{s.label}</span>
               </div>
             );

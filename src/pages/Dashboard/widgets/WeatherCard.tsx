@@ -254,16 +254,6 @@ export function WeatherCard({ className }: { className?: string }) {
           </>
         )}
 
-        {/* ── Change location trigger ── */}
-        {!editing && (
-          <button
-            onClick={openSearch}
-            className="mt-2 self-start flex items-center gap-1 text-[11px] text-text-muted hover:text-accent transition-colors focus-ring rounded"
-          >
-            <Pencil className="size-3" />
-            Change location
-          </button>
-        )}
       </CardBody>
     </Card>
   );

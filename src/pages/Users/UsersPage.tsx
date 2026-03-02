@@ -177,22 +177,21 @@ function DeleteConfirmModal({ name, onConfirm, onCancel, busy }: {
 // ── Expanded user row ─────────────────────────────────────────────────────────
 
 interface UserRowProps {
-  profile:           import('../../context/AuthContext').Profile;
-  isSelf:            boolean;
-  isSuperAdmin:      boolean;
-  allCustomers:      { id: string; name: string }[];
-  onRoleChange:      (id: string, role: UserRole) => Promise<void>;
-  onNameSave:        (id: string, name: string) => Promise<void>;
-  onDelete:          (id: string, name: string) => void;
+  profile:              import('../../context/AuthContext').Profile;
+  isSelf:               boolean;
+  isSuperAdmin:         boolean;
+  allCustomers:         { id: string; name: string }[];
+  onRoleChange:         (id: string, role: UserRole) => Promise<void>;
+  onNameSave:           (id: string, name: string) => Promise<void>;
+  onDelete:             (id: string, name: string) => void;
+  onFetchAssignments:   (userId: string) => Promise<string[]>;
+  onSaveAssignments:    (userId: string, ids: string[]) => Promise<void>;
 }
 
 function UserRow({
   profile, isSelf, isSuperAdmin, allCustomers, onRoleChange, onNameSave, onDelete,
+  onFetchAssignments, onSaveAssignments,
 }: UserRowProps) {
-  const {
-    fetchAssignedCustomers,
-    setCustomerAssignments,
-  } = useProfiles();
 
   const [expanded,       setExpanded]       = useState(false);
   const [nameDraft,      setNameDraft]      = useState(profile.name ?? '');
@@ -211,11 +210,11 @@ function UserRow({
     if (!needsCustomerScope) return;
     setAssignLoading(true);
     try {
-      const ids = await fetchAssignedCustomers(profile.id);
+      const ids = await onFetchAssignments(profile.id);
       setAssignedIds(ids);
     } catch { /* ignore */ }
     setAssignLoading(false);
-  }, [fetchAssignedCustomers, profile.id, needsCustomerScope]);
+  }, [onFetchAssignments, profile.id, needsCustomerScope]);
 
   useEffect(() => {
     if (expanded) loadAssignments();
@@ -253,7 +252,7 @@ function UserRow({
     setAssignSaving(true);
     setAssignError(null);
     try {
-      await setCustomerAssignments(profile.id, assignedIds);
+      await onSaveAssignments(profile.id, assignedIds);
       setAssignSaved(true);
       setTimeout(() => setAssignSaved(false), 2000);
     } catch (err) {
@@ -436,7 +435,8 @@ function UserRow({
 export function UsersPage() {
   const { profile: currentProfile }                         = useAuth();
   const { profiles, loading, error, fetchProfiles,
-          updateRole, updateName, createUser, deleteProfile } = useProfiles();
+          updateRole, updateName, createUser, deleteProfile,
+          fetchAssignedCustomers, setCustomerAssignments }   = useProfiles();
   const { customers }                                       = useCustomers();
 
   const [showCreate,   setShowCreate]   = useState(false);
@@ -556,6 +556,8 @@ export function UsersPage() {
                   onRoleChange={handleRoleChange}
                   onNameSave={handleNameSave}
                   onDelete={(id, name) => setDeleteTarget({ id, name })}
+                  onFetchAssignments={fetchAssignedCustomers}
+                  onSaveAssignments={setCustomerAssignments}
                 />
               ))}
               {profiles.length === 0 && (

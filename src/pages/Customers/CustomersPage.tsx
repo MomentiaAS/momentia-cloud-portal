@@ -7,6 +7,7 @@ import { SkeletonCard } from '../../components/ui/Skeleton';
 import { CustomerSection } from './CustomerSection';
 import { CustomerForm } from './CustomerForm';
 import { useCustomers } from '../../hooks/useCustomers';
+import { useAuth } from '../../context/AuthContext';
 import type { Customer } from '../../types';
 
 export function CustomersPage() {
@@ -15,6 +16,9 @@ export function CustomersPage() {
   const [query, setQuery]              = useState(searchParams.get('q') ?? '');
   const [formOpen, setFormOpen]        = useState(false);
   const [editing, setEditing]          = useState<Customer | null>(null);
+
+  const { profile } = useAuth();
+  const isRestricted = profile?.role === 'viewer' || profile?.role === 'technician';
 
   const { customers, loading, error, reload, addCustomer, editCustomer } = useCustomers();
 
@@ -46,17 +50,21 @@ export function CustomersPage() {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Customers</h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            {customers.filter(c => c.status === 'active').length} active ·{' '}
-            {customers.filter(c => c.status === 'potential').length} potential
+            {isRestricted
+              ? `${customers.length} customer${customers.length !== 1 ? 's' : ''}`
+              : `${customers.filter(c => c.status === 'active').length} active · ${customers.filter(c => c.status === 'potential').length} potential`
+            }
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={reload} aria-label="Refresh" disabled={loading}>
             <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button variant="primary" onClick={openAdd} leftIcon={<Plus className="size-4" />}>
-            Add Customer
-          </Button>
+          {!isRestricted && (
+            <Button variant="primary" onClick={openAdd} leftIcon={<Plus className="size-4" />}>
+              Add Customer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -90,10 +98,14 @@ export function CustomersPage() {
       {/* Sections */}
       {!loading && (
         <>
-          <CustomerSection title="Active"    customers={active}    onEdit={openEdit} onView={handleView} defaultOpen />
-          <CustomerSection title="Potential" customers={potential} onEdit={openEdit} onView={handleView} defaultOpen />
-          <CustomerSection title="Archived"  customers={archived}  onEdit={openEdit} onView={handleView}
-            defaultOpen={false} collapsible archived />
+          <CustomerSection title="Active" customers={active} onEdit={openEdit} onView={handleView} defaultOpen />
+          {!isRestricted && (
+            <>
+              <CustomerSection title="Potential" customers={potential} onEdit={openEdit} onView={handleView} defaultOpen />
+              <CustomerSection title="Archived"  customers={archived}  onEdit={openEdit} onView={handleView}
+                defaultOpen={false} collapsible archived />
+            </>
+          )}
         </>
       )}
 

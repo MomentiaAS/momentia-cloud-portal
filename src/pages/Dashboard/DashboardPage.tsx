@@ -1,20 +1,21 @@
-import { useApp } from '../../context/AppContext';
 import { DateTimeCard }          from './widgets/DateTimeCard';
 import { WeatherCard }           from './widgets/WeatherCard';
 import { EnvironmentStatusCard } from './widgets/EnvironmentStatusCard';
 import { CriticalAlertsCard }    from './widgets/CriticalAlertsCard';
 import { CustomerOverviewCard }  from './widgets/CustomerOverviewCard';
 import { NewsWidget }            from './widgets/NewsWidget';
+import { useAuth } from '../../context/AuthContext';
 
 export function DashboardPage() {
-  const { user } = useApp();
+  const { profile } = useAuth();
+  const firstName = profile?.name?.split(' ')[0] ?? 'there';
 
   return (
     <div className="space-y-6">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary">
-          Welcome back, {user.name.split(' ')[0]}
+          Welcome back, {firstName}
         </h1>
         <p className="text-sm text-text-secondary mt-0.5">
           Here's your operational overview for today.

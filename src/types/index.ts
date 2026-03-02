@@ -3,7 +3,7 @@
 export type CustomerStatus = 'active' | 'potential' | 'archived';
 export type HealthStatus   = 'healthy' | 'degraded' | 'critical' | 'unknown';
 export type Severity       = 'critical' | 'high' | 'medium' | 'low' | 'info';
-export type ServiceTier    = 'basic' | 'standard' | 'premium' | 'enterprise';
+export type ServiceTier    = 'basic' | 'pro' | 'advanced';
 
 export interface Contact {
   name:  string;
@@ -25,6 +25,7 @@ export interface Customer {
   billingContact?: Contact;
   domain?:      string;
   address?:     string;
+  state?:       string;
   notes?:       string;
   integrations: {
     veeam:      boolean;
@@ -32,7 +33,9 @@ export interface Customer {
     m365:       boolean;
     azure:      boolean;
     sentinelOne: boolean;
+    unifi:      boolean;
   };
+  unifiSiteId?: string;
   createdAt: string;
 }
 

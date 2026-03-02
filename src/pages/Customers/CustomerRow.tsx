@@ -1,5 +1,6 @@
 import { MoreHorizontal, Eye, Pencil } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { cn } from '../../components/ui/cn';
@@ -21,6 +22,7 @@ interface CustomerRowProps {
 }
 
 export function CustomerRow({ customer: c, onEdit, onView, archived }: CustomerRowProps) {
+  const navigate   = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,12 +43,15 @@ export function CustomerRow({ customer: c, onEdit, onView, archived }: CustomerR
           : 'hover:bg-primary-50/60 dark:hover:bg-primary-800/20',
       )}
     >
-      {/* Name */}
+      {/* Name — clicking navigates to customer detail */}
       <td className="px-4 py-3">
-        <div>
-          <p className="text-sm font-medium text-text-primary">{c.name}</p>
+        <button
+          onClick={() => navigate(`/customers/${c.id}`)}
+          className="text-left group"
+        >
+          <p className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">{c.name}</p>
           {c.domain && <p className="text-xs text-text-muted">{c.domain}</p>}
-        </div>
+        </button>
       </td>
 
       {/* Health */}

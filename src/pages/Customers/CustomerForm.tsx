@@ -1,19 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import type { Customer, ServiceTier, CustomerStatus } from '../../types';
 import type { CustomerFormPayload } from '../../hooks/useCustomers';
+import { supabase } from '../../lib/supabase';
 
 const DEFAULT: CustomerFormPayload = {
-  name: '', status: 'active', tier: 'standard',
-  domain: '', address: '', assignedTech: '',
+  name: '', status: 'active', tier: 'basic',
+  domain: '', address: '', state: '', assignedTech: '',
   contactName: '', contactEmail: '', contactPhone: '', contactRole: '',
+  secContactName: '', secContactEmail: '', secContactPhone: '', secContactRole: '',
   notes: '',
   veeam: false, rmm: false, m365: false, azure: false, sentinelOne: false,
+  unifi: false, unifiSiteId: '',
 };
 
-const TECHS = ['Alice Hartman', 'Marco Rivera', 'Priya Nair', 'Unassigned'];
+/** Fetches display names for the technician dropdown. */
+function useTechOptions() {
+  const [techs, setTechs] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('id, name, email, role')
+      .in('role', ['superadmin', 'admin', 'technician'])
+      .order('name', { ascending: true })
+      .then(({ data }) => {
+        if (data) {
+          setTechs(data.map(p => ({
+            id:    p.name ?? p.email,
+            label: p.name ?? p.email,
+          })));
+        }
+      });
+  }, []);
+  return techs;
+}
 
 interface CustomerFormProps {
   open:     boolean;
@@ -23,25 +45,34 @@ interface CustomerFormProps {
 }
 
 export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormProps) {
-  const [form, setForm]   = useState<CustomerFormPayload>(() => {
+  const techs = useTechOptions();
+  const [form, setForm] = useState<CustomerFormPayload>(() => {
     if (!initial) return DEFAULT;
+    const sec = initial.billingContact;
     return {
-      name:         initial.name,
-      status:       initial.status,
-      tier:         initial.tier,
-      domain:       initial.domain ?? '',
-      address:      initial.address ?? '',
-      assignedTech: initial.assignedTech,
-      contactName:  initial.primaryContact.name,
-      contactEmail: initial.primaryContact.email,
-      contactPhone: initial.primaryContact.phone ?? '',
-      contactRole:  initial.primaryContact.role ?? '',
-      notes:        initial.notes ?? '',
-      veeam:        initial.integrations.veeam,
-      rmm:          initial.integrations.rmm,
-      m365:         initial.integrations.m365,
-      azure:        initial.integrations.azure,
-      sentinelOne:  initial.integrations.sentinelOne,
+      name:           initial.name,
+      status:         initial.status,
+      tier:           initial.tier,
+      domain:         initial.domain ?? '',
+      address:        initial.address ?? '',
+      state:          initial.state ?? '',
+      assignedTech:   initial.assignedTech,
+      contactName:    initial.primaryContact.name,
+      contactEmail:   initial.primaryContact.email,
+      contactPhone:   initial.primaryContact.phone ?? '',
+      contactRole:    initial.primaryContact.role ?? '',
+      secContactName:  sec?.name  ?? '',
+      secContactEmail: sec?.email ?? '',
+      secContactPhone: sec?.phone ?? '',
+      secContactRole:  sec?.role  ?? '',
+      notes:          initial.notes ?? '',
+      veeam:          initial.integrations.veeam,
+      rmm:            initial.integrations.rmm,
+      m365:           initial.integrations.m365,
+      azure:          initial.integrations.azure,
+      sentinelOne:    initial.integrations.sentinelOne,
+      unifi:          initial.integrations.unifi ?? false,
+      unifiSiteId:    initial.unifiSiteId ?? '',
     };
   });
 
@@ -55,6 +86,8 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
     if (!form.contactName.trim())  e.contactName = 'Contact name is required';
     if (!form.contactEmail.trim()) e.contactEmail = 'Contact email is required';
     else if (!/\S+@\S+\.\S+/.test(form.contactEmail)) e.contactEmail = 'Invalid email address';
+    if (form.secContactEmail && !/\S+@\S+\.\S+/.test(form.secContactEmail))
+      e.secContactEmail = 'Invalid email address';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -119,7 +152,6 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               value={form.name}
               onChange={e => set('name', e.target.value)}
               error={errors.name}
-              placeholder="Northgate Engineering"
               className="sm:col-span-2"
             />
             <Select label="Status" value={form.status} onChange={e => set('status', e.target.value as CustomerStatus)}>
@@ -127,23 +159,25 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               <option value="potential">Potential</option>
               <option value="archived">Archived</option>
             </Select>
-            <Select label="Service Tier" value={form.tier} onChange={e => set('tier', e.target.value as ServiceTier)}>
+            <Select label="Subscription" value={form.tier} onChange={e => set('tier', e.target.value as ServiceTier)}>
               <option value="basic">Basic</option>
-              <option value="standard">Standard</option>
-              <option value="premium">Premium</option>
-              <option value="enterprise">Enterprise</option>
+              <option value="pro">Pro</option>
+              <option value="advanced">Advanced</option>
             </Select>
             <Input
               label="Domain"
               value={form.domain}
               onChange={e => set('domain', e.target.value)}
-              placeholder="acme.com"
             />
             <Input
               label="Address"
               value={form.address}
               onChange={e => set('address', e.target.value)}
-              placeholder="42 Bridge St, Sydney"
+            />
+            <Input
+              label="State"
+              value={form.state}
+              onChange={e => set('state', e.target.value)}
             />
           </div>
         </section>
@@ -157,7 +191,6 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               value={form.contactName}
               onChange={e => set('contactName', e.target.value)}
               error={errors.contactName}
-              placeholder="Jordan Keane"
             />
             <Input
               label="Email *"
@@ -165,20 +198,47 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               value={form.contactEmail}
               onChange={e => set('contactEmail', e.target.value)}
               error={errors.contactEmail}
-              placeholder="jordan@acme.com"
             />
             <Input
               label="Phone"
               type="tel"
               value={form.contactPhone}
               onChange={e => set('contactPhone', e.target.value)}
-              placeholder="+61 2 8001 1234"
             />
             <Input
               label="Role / Title"
               value={form.contactRole}
               onChange={e => set('contactRole', e.target.value)}
-              placeholder="IT Manager"
+            />
+          </div>
+        </section>
+
+        {/* Secondary Contact */}
+        <section>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">Secondary Contact</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Full Name"
+              value={form.secContactName}
+              onChange={e => set('secContactName', e.target.value)}
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={form.secContactEmail}
+              onChange={e => set('secContactEmail', e.target.value)}
+              error={errors.secContactEmail}
+            />
+            <Input
+              label="Phone"
+              type="tel"
+              value={form.secContactPhone}
+              onChange={e => set('secContactPhone', e.target.value)}
+            />
+            <Input
+              label="Role / Title"
+              value={form.secContactRole}
+              onChange={e => set('secContactRole', e.target.value)}
             />
           </div>
         </section>
@@ -191,8 +251,10 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
             value={form.assignedTech}
             onChange={e => set('assignedTech', e.target.value)}
           >
-            <option value="">Select…</option>
-            {TECHS.map(t => <option key={t} value={t}>{t}</option>)}
+            <option value="">Unassigned</option>
+            {techs.map(t => (
+              <option key={t.id} value={t.label}>{t.label}</option>
+            ))}
           </Select>
         </section>
 
@@ -205,7 +267,21 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
             <Toggle label="Microsoft 365" field="m365" />
             <Toggle label="Azure"         field="azure" />
             <Toggle label="SentinelOne"   field="sentinelOne" />
+            <Toggle label="UniFi Network" field="unifi" />
           </div>
+          {form.unifi && (
+            <div className="mt-3">
+              <Input
+                label="UniFi Site ID"
+                value={form.unifiSiteId}
+                onChange={e => set('unifiSiteId', e.target.value)}
+                placeholder="e.g. 5f3e2a1b4c9d8e7f6a5b4c3d"
+              />
+              <p className="text-xs text-text-muted mt-1">
+                Find your Site ID by going to Users → UniFi → Discover Sites in this portal after saving.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* Notes */}
@@ -214,7 +290,6 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
           <Textarea
             value={form.notes}
             onChange={e => set('notes', e.target.value)}
-            placeholder="Any relevant context about this customer…"
           />
         </section>
       </div>

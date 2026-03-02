@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Sun, Moon, Bell, Menu, RefreshCw, CalendarDays, ChevronDown } from 'lucide-react';
+import { Search, Sun, Moon, Bell, Menu, RefreshCw, CalendarDays, ChevronDown, LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../ui/cn';
 import { Avatar } from '../ui/Avatar';
@@ -8,24 +8,25 @@ import { Input } from '../ui/Input';
 import { CountBadge } from '../ui/Badge';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 const DATE_RANGES = ['Today', 'Last 7 days', 'Last 30 days', 'This month', 'Custom…'];
 
 export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: boolean }) {
-  const { theme, toggleTheme } = useTheme();
-  const { toggleSidebar, user, notificationCount } = useApp();
+  const { theme, toggleTheme }         = useTheme();
+  const { toggleSidebar, notificationCount } = useApp();
+  const { profile, signOut }           = useAuth();
   const navigate = useNavigate();
 
-  const [searchVal, setSearchVal] = useState('');
-  const [dateRange, setDateRange]  = useState('Last 7 days');
+  const [searchVal, setSearchVal]       = useState('');
+  const [dateRange, setDateRange]       = useState('Last 7 days');
   const [showDateDrop, setShowDateDrop] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [refreshSpin, setRefreshSpin] = useState(false);
+  const [refreshSpin, setRefreshSpin]   = useState(false);
 
   const dateRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function onOutside(e: MouseEvent) {
       if (dateRef.current && !dateRef.current.contains(e.target as Node)) setShowDateDrop(false);
@@ -44,6 +45,14 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
     setRefreshSpin(true);
     setTimeout(() => setRefreshSpin(false), 800);
   }
+
+  async function handleSignOut() {
+    setShowUserMenu(false);
+    await signOut();
+    navigate('/login', { replace: true });
+  }
+
+  const displayName = profile?.name ?? profile?.email ?? 'User';
 
   return (
     <header
@@ -121,10 +130,7 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
 
       {/* Theme toggle */}
       <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
-        {theme === 'dark'
-          ? <Sun className="size-4" />
-          : <Moon className="size-4" />
-        }
+        {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </Button>
 
       {/* Notifications */}
@@ -151,33 +157,35 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
           aria-haspopup="true"
           aria-expanded={showUserMenu}
         >
-          <Avatar name={user.name} src={user.avatar} size="sm" />
-          <span className="hidden md:block text-sm font-medium text-text-primary">{user.name}</span>
+          <Avatar name={displayName} size="sm" />
+          <span className="hidden md:block text-sm font-medium text-text-primary">{displayName}</span>
           <ChevronDown className="hidden md:block size-3 text-text-muted" />
         </button>
 
         {showUserMenu && (
-          <div className="absolute right-0 mt-1 w-52 bg-surface-raised border border-border rounded-xl shadow-popover z-20 overflow-hidden">
+          <div className="absolute right-0 mt-1 w-56 bg-surface-raised border border-border rounded-xl shadow-popover z-20 overflow-hidden">
             <div className="px-4 py-3 border-b border-border">
-              <p className="text-sm font-semibold text-text-primary">{user.name}</p>
-              <p className="text-xs text-text-muted">{user.email}</p>
+              <p className="text-sm font-semibold text-text-primary truncate">{displayName}</p>
+              <p className="text-xs text-text-muted truncate">{profile?.email}</p>
+              {profile?.role && (
+                <p className="text-[10px] font-medium uppercase tracking-wider text-text-muted mt-0.5">{profile.role}</p>
+              )}
             </div>
             <div className="py-1">
-              {[
-                { label: 'Profile',   action: () => navigate('/settings') },
-                { label: 'Settings',  action: () => navigate('/settings') },
-              ].map(item => (
-                <button
-                  key={item.label}
-                  onClick={() => { item.action(); setShowUserMenu(false); }}
-                  className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
-                >
-                  {item.label}
-                </button>
-              ))}
+              <button
+                onClick={() => { navigate('/settings'); setShowUserMenu(false); }}
+                className="w-full flex items-center gap-2.5 text-left px-4 py-2 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+              >
+                <UserCircle className="size-3.5" />
+                Profile &amp; Settings
+              </button>
             </div>
             <div className="border-t border-border py-1">
-              <button className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2.5 text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                <LogOut className="size-3.5" />
                 Sign out
               </button>
             </div>

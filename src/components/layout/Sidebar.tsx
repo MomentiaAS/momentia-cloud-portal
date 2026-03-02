@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, HeadphonesIcon, ScrollText,
-  DatabaseBackup, Bell, Settings, X, ChevronRight,
+  DatabaseBackup, Bell, Settings, X, ChevronRight, UserCog, Wifi,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
 import { CountBadge } from '../ui/Badge';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface NavItem {
   label:    string;
@@ -25,6 +26,11 @@ const topNav: NavItem[] = [
 const bottomNav: NavItem[] = [
   { label: 'Notifications', to: '/notifications', icon: Bell, badge: 4 },
   { label: 'Settings',      to: '/settings',      icon: Settings },
+];
+
+const adminNav: NavItem[] = [
+  { label: 'Users',        to: '/users',        icon: UserCog },
+  { label: 'UniFi Sites',  to: '/unifi-sites',  icon: Wifi    },
 ];
 
 function NavItemRow({ item, onClick }: { item: NavItem; onClick?: () => void }) {
@@ -66,6 +72,9 @@ interface SidebarProps {
 
 export function Sidebar({ mobile }: SidebarProps) {
   const { setSidebarOpen } = useApp();
+  const { profile }        = useAuth();
+  const isSuperAdmin  = profile?.role === 'superadmin';
+  const canViewUsers  = profile?.role === 'superadmin' || profile?.role === 'admin';
 
   const handleNav = () => {
     if (mobile) setSidebarOpen(false);
@@ -115,6 +124,18 @@ export function Sidebar({ mobile }: SidebarProps) {
           <NavItemRow key={item.to} item={item} onClick={handleNav} />
         ))}
       </div>
+
+      {/* Admin nav — superadmin and admin */}
+      {canViewUsers && (
+        <div className="px-3 pb-2 pt-2 border-t border-border space-y-0.5">
+          <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+            Admin
+          </p>
+          {adminNav.map(item => (
+            <NavItemRow key={item.to} item={item} onClick={handleNav} />
+          ))}
+        </div>
+      )}
 
       {/* Bottom nav */}
       <div className="px-3 pb-4 pt-2 border-t border-border space-y-0.5">

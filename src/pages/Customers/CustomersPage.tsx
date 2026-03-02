@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus, Search, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -11,6 +11,7 @@ import type { Customer } from '../../types';
 
 export function CustomersPage() {
   const [searchParams]                 = useSearchParams();
+  const navigate                       = useNavigate();
   const [query, setQuery]              = useState(searchParams.get('q') ?? '');
   const [formOpen, setFormOpen]        = useState(false);
   const [editing, setEditing]          = useState<Customer | null>(null);
@@ -34,8 +35,8 @@ export function CustomersPage() {
 
   function openEdit(c: Customer) { setEditing(c); setFormOpen(true); }
   function openAdd()              { setEditing(null); setFormOpen(true); }
-  function handleView(_c: Customer) {
-    // Stub — navigate to customer detail page in a future iteration
+  function handleView(c: Customer) {
+    navigate(`/customers/${c.id}`);
   }
 
   return (

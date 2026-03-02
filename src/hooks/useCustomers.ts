@@ -3,46 +3,63 @@ import { fetchCustomers, insertCustomer, updateCustomer, deleteCustomer } from '
 import type { Customer } from '../types';
 
 export interface CustomerFormPayload {
-  name:          string;
-  status:        string;
-  tier:          string;
-  domain:        string;
-  address:       string;
-  assignedTech:  string;
-  notes:         string;
-  contactName:   string;
-  contactEmail:  string;
-  contactPhone:  string;
-  contactRole:   string;
-  veeam:         boolean;
-  rmm:           boolean;
-  m365:          boolean;
-  azure:         boolean;
-  sentinelOne:   boolean;
+  name:               string;
+  status:             string;
+  tier:               string;
+  domain:             string;
+  address:            string;
+  state:              string;
+  assignedTech:       string;
+  notes:              string;
+  contactName:        string;
+  contactEmail:       string;
+  contactPhone:       string;
+  contactRole:        string;
+  secContactName:     string;
+  secContactEmail:    string;
+  secContactPhone:    string;
+  secContactRole:     string;
+  veeam:              boolean;
+  rmm:                boolean;
+  m365:               boolean;
+  azure:              boolean;
+  sentinelOne:        boolean;
+  unifi:              boolean;
+  unifiSiteId:        string;
 }
 
 function payloadToDb(data: CustomerFormPayload) {
+  const hasSecContact = data.secContactName.trim() || data.secContactEmail.trim();
   return {
     name:         data.name,
     status:       data.status,
     tier:         data.tier,
-    domain:       data.domain   || undefined,
-    address:      data.address  || undefined,
+    domain:       data.domain       || undefined,
+    address:      data.address      || undefined,
+    state:        data.state        || undefined,
     assignedTech: data.assignedTech || undefined,
-    notes:        data.notes    || undefined,
+    notes:        data.notes        || undefined,
     primaryContact: {
       name:  data.contactName,
       email: data.contactEmail,
       phone: data.contactPhone || undefined,
       role:  data.contactRole  || undefined,
     },
+    secondaryContact: hasSecContact ? {
+      name:  data.secContactName  || undefined,
+      email: data.secContactEmail || undefined,
+      phone: data.secContactPhone || undefined,
+      role:  data.secContactRole  || undefined,
+    } : undefined,
     integrations: {
       veeam:       data.veeam,
       rmm:         data.rmm,
       m365:        data.m365,
       azure:       data.azure,
       sentinelOne: data.sentinelOne,
+      unifi:       data.unifi,
     },
+    unifiSiteId: data.unifiSiteId || undefined,
   };
 }
 

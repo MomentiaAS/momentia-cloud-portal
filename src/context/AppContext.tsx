@@ -1,13 +1,12 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { demoUser, demoWeather } from '../data/demo';
+import { demoWeather } from '../data/demo';
 
 interface AppContextValue {
-  sidebarOpen: boolean;
+  sidebarOpen:    boolean;
   setSidebarOpen: (open: boolean) => void;
-  toggleSidebar: () => void;
-  user: typeof demoUser;
+  toggleSidebar:  () => void;
   notificationCount: number;
-  weatherCity: string;
+  weatherCity:    string;
   setWeatherCity: (city: string) => void;
 }
 
@@ -34,7 +33,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sidebarOpen,
         setSidebarOpen,
         toggleSidebar,
-        user: demoUser,
         notificationCount: 4,
         weatherCity,
         setWeatherCity,

@@ -40,7 +40,7 @@ function CopyChip({ value }: { value: string }) {
 // ── Single site card ──────────────────────────────────────────────────────────
 
 function SiteCard({ site }: { site: UnifiSiteListItem }) {
-  const siteId    = site.siteId ?? site.id ?? '';
+  const siteId    = site.siteId ?? '';
   // deviceName comes from the host's reportedState.hostname — this is the
   // meaningful name ("Momentia Lab", "H203_FW01"). Fall back through desc → name.
   const siteName  = site.deviceName ?? site.meta?.desc ?? site.meta?.name ?? 'Unnamed Site';
@@ -195,7 +195,7 @@ export function UnifiSitesPage() {
           )}
 
           {!loading && !error && sites.map((site, idx) => (
-            <SiteCard key={site.siteId ?? site.id ?? idx} site={site} />
+            <SiteCard key={site.siteId ?? idx} site={site} />
           ))}
 
         </CardBody>

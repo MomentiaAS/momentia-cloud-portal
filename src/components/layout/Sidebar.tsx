@@ -73,7 +73,6 @@ interface SidebarProps {
 export function Sidebar({ mobile }: SidebarProps) {
   const { setSidebarOpen } = useApp();
   const { profile }        = useAuth();
-  const isSuperAdmin  = profile?.role === 'superadmin';
   const canViewUsers  = profile?.role === 'superadmin' || profile?.role === 'admin';
 
   const handleNav = () => {

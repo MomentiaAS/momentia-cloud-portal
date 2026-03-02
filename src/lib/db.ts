@@ -253,7 +253,7 @@ export async function fetchAssignedUsersByCustomer(customerId: string): Promise<
     .select('profiles(*)')
     .eq('customer_id', customerId);
   if (error) throw new Error(error.message);
-  return (data as { profiles: Profile }[]).map(r => r.profiles).filter(Boolean);
+  return (data as unknown as { profiles: Profile }[]).map(r => r.profiles).filter(Boolean);
 }
 
 export async function fetchBackupJobs(): Promise<BackupJob[]> {

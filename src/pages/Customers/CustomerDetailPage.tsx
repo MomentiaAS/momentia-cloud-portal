@@ -6,7 +6,7 @@ import {
   Shield, Wrench, Eye,
   Mail, Phone, User as UserIcon,
   Server, Cloud, HardDrive, Globe, ShieldCheck,
-  X, ChevronRight, Wifi, WifiOff, Activity, Users as UsersIcon,
+  X, ChevronRight, Wifi, WifiOff, Users as UsersIcon,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -21,7 +21,7 @@ import { updateCustomer } from '../../lib/db';
 import { CustomerForm } from './CustomerForm';
 import type { Customer, Alert, BackupJob, LogEntry } from '../../types';
 import type { HealthStatus, Severity } from '../../types';
-import type { Profile, UserRole } from '../../context/AuthContext';
+import type { UserRole } from '../../context/AuthContext';
 import { useAuth } from '../../context/AuthContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

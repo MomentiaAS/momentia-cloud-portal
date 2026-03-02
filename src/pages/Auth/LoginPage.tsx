@@ -1,17 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Sun, Moon, AlertCircle } from 'lucide-react';
+import { Sun, Moon, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../components/ui/cn';
 
 export function LoginPage() {
   const { signIn } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [error,    setError]    = useState<string | null>(null);
-  const [busy,     setBusy]     = useState(false);
+  const [email,       setEmail]       = useState('');
+  const [password,    setPassword]    = useState('');
+  const [showPass,    setShowPass]    = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+  const [busy,        setBusy]        = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -97,19 +98,29 @@ export function LoginPage() {
                 <label htmlFor="password" className="text-xs font-medium text-text-secondary uppercase tracking-wider">
                   Password
                 </label>
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className={cn(
-                    'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary',
-                    'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
-                    'transition-colors',
-                  )}
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPass ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className={cn(
+                      'h-10 w-full rounded-lg border border-border bg-surface pl-3 pr-10 text-sm text-text-primary',
+                      'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
+                      'transition-colors',
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                    aria-label={showPass ? 'Hide password' : 'Show password'}
+                  >
+                    {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               <button

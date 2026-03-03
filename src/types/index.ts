@@ -88,6 +88,8 @@ export interface Asset {
   serial?:      string;
   os?:          string;
   assignedTo?:  string;
+  ipAddress?:   string;
+  macAddress?:  string;
   status:       AssetStatus;
   purchaseDate?: string;   // ISO date string (date only)
   warrantyEnd?:  string;   // ISO date string (date only)

@@ -39,6 +39,7 @@ type DbAsset = {
   id: string; customer_id: string; name: string; type: string;
   make: string | null; model: string | null; serial: string | null;
   os: string | null; assigned_to: string | null; status: string;
+  ip_address: string | null; mac_address: string | null;
   purchase_date: string | null; warranty_end: string | null;
   notes: string | null; created_at: string;
 };
@@ -286,6 +287,8 @@ function toAsset(r: DbAsset): Asset {
     serial:       r.serial      ?? undefined,
     os:           r.os          ?? undefined,
     assignedTo:   r.assigned_to ?? undefined,
+    ipAddress:    r.ip_address  ?? undefined,
+    macAddress:   r.mac_address ?? undefined,
     status:       r.status as Asset['status'],
     purchaseDate: r.purchase_date ?? undefined,
     warrantyEnd:  r.warranty_end  ?? undefined,
@@ -315,8 +318,9 @@ export async function fetchAllAssets(): Promise<Asset[]> {
 
 export interface AssetPayload {
   name: string; type: string; make?: string; model?: string;
-  serial?: string; os?: string; assignedTo?: string; status: string;
-  purchaseDate?: string; warrantyEnd?: string; notes?: string;
+  serial?: string; os?: string; assignedTo?: string;
+  ipAddress?: string; macAddress?: string;
+  status: string; purchaseDate?: string; warrantyEnd?: string; notes?: string;
 }
 
 export async function insertAsset(customerId: string, p: AssetPayload): Promise<Asset> {
@@ -331,6 +335,8 @@ export async function insertAsset(customerId: string, p: AssetPayload): Promise<
       serial:        p.serial        || null,
       os:            p.os            || null,
       assigned_to:   p.assignedTo    || null,
+      ip_address:    p.ipAddress     || null,
+      mac_address:   p.macAddress    || null,
       status:        p.status,
       purchase_date: p.purchaseDate  || null,
       warranty_end:  p.warrantyEnd   || null,
@@ -353,6 +359,8 @@ export async function updateAsset(id: string, p: AssetPayload): Promise<Asset> {
       serial:        p.serial        || null,
       os:            p.os            || null,
       assigned_to:   p.assignedTo    || null,
+      ip_address:    p.ipAddress     || null,
+      mac_address:   p.macAddress    || null,
       status:        p.status,
       purchase_date: p.purchaseDate  || null,
       warranty_end:  p.warrantyEnd   || null,

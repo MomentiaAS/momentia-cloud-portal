@@ -29,8 +29,8 @@ const ASSET_STATUSES: { value: AssetStatus; label: string }[] = [
 
 const BLANK: AssetPayload = {
   name: '', type: 'computer', make: '', model: '', serial: '',
-  os: '', assignedTo: '', status: 'active',
-  purchaseDate: '', warrantyEnd: '', notes: '',
+  os: '', assignedTo: '', ipAddress: '', macAddress: '',
+  status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
 
 function toPayload(a: Asset): AssetPayload {
@@ -42,6 +42,8 @@ function toPayload(a: Asset): AssetPayload {
     serial:       a.serial       ?? '',
     os:           a.os           ?? '',
     assignedTo:   a.assignedTo   ?? '',
+    ipAddress:    a.ipAddress    ?? '',
+    macAddress:   a.macAddress   ?? '',
     status:       a.status,
     purchaseDate: a.purchaseDate ?? '',
     warrantyEnd:  a.warrantyEnd  ?? '',
@@ -152,6 +154,14 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
               <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Assigned To</label>
                 <input className={inputClass} value={form.assignedTo} onChange={e => set('assignedTo', e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">IP Address</label>
+                <input className={inputClass} value={form.ipAddress} onChange={e => set('ipAddress', e.target.value)} placeholder="e.g. 192.168.1.10" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">MAC Address</label>
+                <input className={inputClass} value={form.macAddress} onChange={e => set('macAddress', e.target.value)} placeholder="e.g. AA:BB:CC:DD:EE:FF" />
               </div>
             </div>
           </section>

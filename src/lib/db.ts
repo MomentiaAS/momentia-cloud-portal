@@ -39,7 +39,7 @@ type DbAsset = {
   id: string; customer_id: string; name: string; type: string;
   make: string | null; model: string | null; serial: string | null;
   os: string | null; assigned_to: string | null; status: string;
-  ip_address: string | null; mac_address: string | null;
+  ip_address: string | null; mac_address: string | null; location: string | null;
   purchase_date: string | null; warranty_end: string | null;
   notes: string | null; created_at: string;
 };
@@ -289,6 +289,7 @@ function toAsset(r: DbAsset): Asset {
     assignedTo:   r.assigned_to ?? undefined,
     ipAddress:    r.ip_address  ?? undefined,
     macAddress:   r.mac_address ?? undefined,
+    location:     r.location    ?? undefined,
     status:       r.status as Asset['status'],
     purchaseDate: r.purchase_date ?? undefined,
     warrantyEnd:  r.warranty_end  ?? undefined,
@@ -319,7 +320,7 @@ export async function fetchAllAssets(): Promise<Asset[]> {
 export interface AssetPayload {
   name: string; type: string; make?: string; model?: string;
   serial?: string; os?: string; assignedTo?: string;
-  ipAddress?: string; macAddress?: string;
+  ipAddress?: string; macAddress?: string; location?: string;
   status: string; purchaseDate?: string; warrantyEnd?: string; notes?: string;
 }
 
@@ -337,6 +338,7 @@ export async function insertAsset(customerId: string, p: AssetPayload): Promise<
       assigned_to:   p.assignedTo    || null,
       ip_address:    p.ipAddress     || null,
       mac_address:   p.macAddress    || null,
+      location:      p.location      || null,
       status:        p.status,
       purchase_date: p.purchaseDate  || null,
       warranty_end:  p.warrantyEnd   || null,
@@ -361,6 +363,7 @@ export async function updateAsset(id: string, p: AssetPayload): Promise<Asset> {
       assigned_to:   p.assignedTo    || null,
       ip_address:    p.ipAddress     || null,
       mac_address:   p.macAddress    || null,
+      location:      p.location      || null,
       status:        p.status,
       purchase_date: p.purchaseDate  || null,
       warranty_end:  p.warrantyEnd   || null,

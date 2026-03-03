@@ -386,9 +386,10 @@ create policy "Asset write" on public.assets
     )
   ) with check (auth.uid() is not null);
 
--- v6 → v7: Add IP and MAC address columns to assets
-alter table public.assets add column if not exists ip_address text;
+-- v6 → v7: Add IP, MAC, and location columns to assets
+alter table public.assets add column if not exists ip_address  text;
 alter table public.assets add column if not exists mac_address text;
+alter table public.assets add column if not exists location    text;
 
 -- ── No seed data ──────────────────────────────────────────────────────────────
 -- Add real customers via the portal.

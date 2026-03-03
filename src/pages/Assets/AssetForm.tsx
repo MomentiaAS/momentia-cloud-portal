@@ -29,7 +29,7 @@ const ASSET_STATUSES: { value: AssetStatus; label: string }[] = [
 
 const BLANK: AssetPayload = {
   name: '', type: 'computer', make: '', model: '', serial: '',
-  os: '', assignedTo: '', ipAddress: '', macAddress: '',
+  os: '', assignedTo: '', ipAddress: '', macAddress: '', location: '',
   status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
 
@@ -44,6 +44,7 @@ function toPayload(a: Asset): AssetPayload {
     assignedTo:   a.assignedTo   ?? '',
     ipAddress:    a.ipAddress    ?? '',
     macAddress:   a.macAddress   ?? '',
+    location:     a.location     ?? '',
     status:       a.status,
     purchaseDate: a.purchaseDate ?? '',
     warrantyEnd:  a.warrantyEnd  ?? '',
@@ -157,11 +158,15 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">IP Address</label>
-                <input className={inputClass} value={form.ipAddress} onChange={e => set('ipAddress', e.target.value)} placeholder="e.g. 192.168.1.10" />
+                <input className={inputClass} value={form.ipAddress} onChange={e => set('ipAddress', e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">MAC Address</label>
-                <input className={inputClass} value={form.macAddress} onChange={e => set('macAddress', e.target.value)} placeholder="e.g. AA:BB:CC:DD:EE:FF" />
+                <input className={inputClass} value={form.macAddress} onChange={e => set('macAddress', e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Location</label>
+                <input className={inputClass} value={form.location} onChange={e => set('location', e.target.value)} />
               </div>
             </div>
           </section>

@@ -90,6 +90,7 @@ export interface Asset {
   assignedTo?:  string;
   ipAddress?:   string;
   macAddress?:  string;
+  location?:    string;
   status:       AssetStatus;
   purchaseDate?: string;   // ISO date string (date only)
   warrantyEnd?:  string;   // ISO date string (date only)

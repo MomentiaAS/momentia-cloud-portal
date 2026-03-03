@@ -15,6 +15,7 @@ import { NotificationsPage }  from './pages/Notifications/NotificationsPage';
 import { SettingsPage }       from './pages/Settings/SettingsPage';
 import { UsersPage }          from './pages/Users/UsersPage';
 import { UnifiSitesPage }     from './pages/UnifiSites/UnifiSitesPage';
+import { AssetsPage }         from './pages/Assets/AssetsPage';
 
 /** Full-screen loader shown while the auth session is being restored. */
 function SplashScreen() {
@@ -87,6 +88,7 @@ function InnerRoutes() {
       <Route path="/settings"      element={<SettingsPage />} />
       <Route path="/users"         element={<UsersPage />} />
       <Route path="/unifi-sites"   element={<UnifiSitesPage />} />
+      <Route path="/assets"        element={<AssetsPage />} />
       <Route path="*"              element={<NotFound />} />
     </Routes>
   );

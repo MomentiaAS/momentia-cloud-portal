@@ -4,7 +4,7 @@
  */
 
 import { supabase } from './supabase';
-import type { Customer, Alert, LogEntry, BackupJob } from '../types';
+import type { Customer, Alert, LogEntry, BackupJob, Asset } from '../types';
 import type { Profile } from '../context/AuthContext';
 
 // ── Type for the raw DB row shapes ────────────────────────────────────────────
@@ -33,6 +33,14 @@ type DbBackupJob = {
   last_run: string | null; next_run: string | null; duration: number | null;
   size_gb: number | null; data_source: string | null; repository: string | null;
   retention_days: number; error_message: string | null;
+};
+
+type DbAsset = {
+  id: string; customer_id: string; name: string; type: string;
+  make: string | null; model: string | null; serial: string | null;
+  os: string | null; assigned_to: string | null; status: string;
+  purchase_date: string | null; warranty_end: string | null;
+  notes: string | null; created_at: string;
 };
 
 // ── Mappers ───────────────────────────────────────────────────────────────────
@@ -263,4 +271,101 @@ export async function fetchBackupJobs(): Promise<BackupJob[]> {
     .order('last_run', { ascending: false });
   if (error) throw new Error(error.message);
   return (data as DbBackupJob[]).map(toBackupJob);
+}
+
+// ── Assets ────────────────────────────────────────────────────────────────────
+
+function toAsset(r: DbAsset): Asset {
+  return {
+    id:           r.id,
+    customerId:   r.customer_id,
+    name:         r.name,
+    type:         r.type as Asset['type'],
+    make:         r.make        ?? undefined,
+    model:        r.model       ?? undefined,
+    serial:       r.serial      ?? undefined,
+    os:           r.os          ?? undefined,
+    assignedTo:   r.assigned_to ?? undefined,
+    status:       r.status as Asset['status'],
+    purchaseDate: r.purchase_date ?? undefined,
+    warrantyEnd:  r.warranty_end  ?? undefined,
+    notes:        r.notes        ?? undefined,
+    createdAt:    r.created_at,
+  };
+}
+
+export async function fetchAssetsByCustomer(customerId: string): Promise<Asset[]> {
+  const { data, error } = await supabase
+    .from('assets')
+    .select('*')
+    .eq('customer_id', customerId)
+    .order('name');
+  if (error) throw new Error(error.message);
+  return (data as DbAsset[]).map(toAsset);
+}
+
+export async function fetchAllAssets(): Promise<Asset[]> {
+  const { data, error } = await supabase
+    .from('assets')
+    .select('*')
+    .order('name');
+  if (error) throw new Error(error.message);
+  return (data as DbAsset[]).map(toAsset);
+}
+
+export interface AssetPayload {
+  name: string; type: string; make?: string; model?: string;
+  serial?: string; os?: string; assignedTo?: string; status: string;
+  purchaseDate?: string; warrantyEnd?: string; notes?: string;
+}
+
+export async function insertAsset(customerId: string, p: AssetPayload): Promise<Asset> {
+  const { data, error } = await supabase
+    .from('assets')
+    .insert({
+      customer_id:   customerId,
+      name:          p.name,
+      type:          p.type,
+      make:          p.make          || null,
+      model:         p.model         || null,
+      serial:        p.serial        || null,
+      os:            p.os            || null,
+      assigned_to:   p.assignedTo    || null,
+      status:        p.status,
+      purchase_date: p.purchaseDate  || null,
+      warranty_end:  p.warrantyEnd   || null,
+      notes:         p.notes         || null,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toAsset(data as DbAsset);
+}
+
+export async function updateAsset(id: string, p: AssetPayload): Promise<Asset> {
+  const { data, error } = await supabase
+    .from('assets')
+    .update({
+      name:          p.name,
+      type:          p.type,
+      make:          p.make          || null,
+      model:         p.model         || null,
+      serial:        p.serial        || null,
+      os:            p.os            || null,
+      assigned_to:   p.assignedTo    || null,
+      status:        p.status,
+      purchase_date: p.purchaseDate  || null,
+      warranty_end:  p.warrantyEnd   || null,
+      notes:         p.notes         || null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toAsset(data as DbAsset);
+}
+
+export async function deleteAsset(id: string): Promise<void> {
+  const { error } = await supabase.from('assets').delete().eq('id', id);
+  if (error) throw new Error(error.message);
 }

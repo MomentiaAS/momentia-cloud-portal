@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, HeadphonesIcon, ScrollText,
-  DatabaseBackup, Bell, Settings, X, ChevronRight, UserCog, Wifi,
+  DatabaseBackup, Bell, Settings, X, ChevronRight, UserCog, Wifi, Package,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
 import { CountBadge } from '../ui/Badge';
@@ -30,6 +30,7 @@ const bottomNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { label: 'Users',        to: '/users',        icon: UserCog },
+  { label: 'Assets',       to: '/assets',       icon: Package },
   { label: 'UniFi Sites',  to: '/unifi-sites',  icon: Wifi    },
 ];
 

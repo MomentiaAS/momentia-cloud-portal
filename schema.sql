@@ -336,6 +336,56 @@ create policy "Backup write" on public.backup_jobs
     )
   ) with check (auth.uid() is not null);
 
+-- ── v5 → v6: Assets table ────────────────────────────────────────────────────
+
+create table if not exists public.assets (
+  id            uuid primary key default uuid_generate_v4(),
+  customer_id   uuid not null references public.customers(id) on delete cascade,
+  name          text not null,
+  type          text not null default 'computer'
+                  check (type in ('computer','server','network','mobile','printer','license','other')),
+  make          text,
+  model         text,
+  serial        text,
+  os            text,
+  assigned_to   text,
+  status        text not null default 'active'
+                  check (status in ('active','retired','spare')),
+  purchase_date date,
+  warranty_end  date,
+  notes         text,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.assets enable row level security;
+
+-- SELECT: admin/superadmin see all; technician/viewer see only assigned customers' assets
+create policy "Asset select" on public.assets
+  for select using (
+    auth.uid() is not null and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or exists (
+        select 1 from public.user_customers uc
+        where uc.user_id = auth.uid() and uc.customer_id = assets.customer_id
+      )
+    )
+  );
+
+-- INSERT/UPDATE: superadmin/admin always; technician for assigned customers
+create policy "Asset write" on public.assets
+  for all using (
+    auth.uid() is not null and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and exists (
+          select 1 from public.user_customers uc
+          where uc.user_id = auth.uid() and uc.customer_id = assets.customer_id
+        )
+      )
+    )
+  ) with check (auth.uid() is not null);
+
 -- ── No seed data ──────────────────────────────────────────────────────────────
 -- Add real customers via the portal.
 -- Use the portal to add customers, or insert directly via the Supabase dashboard.

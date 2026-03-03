@@ -7,6 +7,7 @@ import {
   Mail, Phone, User as UserIcon,
   Server, Cloud, HardDrive, Globe, ShieldCheck,
   X, ChevronRight, Wifi, WifiOff, Users as UsersIcon,
+  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -17,9 +18,11 @@ import { cn } from '../../components/ui/cn';
 import { useCustomerDetail } from '../../hooks/useCustomerDetail';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useUnifiStatus } from '../../hooks/useUnifiStatus';
+import { useCustomerAssets } from '../../hooks/useAssets';
 import { updateCustomer } from '../../lib/db';
 import { CustomerForm } from './CustomerForm';
-import type { Customer, Alert, BackupJob, LogEntry } from '../../types';
+import { AssetForm } from '../Assets/AssetForm';
+import type { Customer, Alert, BackupJob, LogEntry, Asset } from '../../types';
 import type { HealthStatus, Severity } from '../../types';
 import type { UserRole } from '../../context/AuthContext';
 import { useAuth } from '../../context/AuthContext';
@@ -110,6 +113,147 @@ function ContactCard({ title, contact }: { title: string; contact?: { name?: str
         )}
       </div>
     </div>
+  );
+}
+
+// ── Tab: Assets ───────────────────────────────────────────────────────────────
+
+const ASSET_TYPE_ICON: Record<string, React.ElementType> = {
+  computer: Laptop, server: Server, network: Network,
+  mobile: Smartphone, printer: Printer, license: Package, other: Package,
+};
+
+const WARRANTY_WARN_DAYS = 90;
+
+function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null {
+  if (!warrantyEnd) return null;
+  const days = Math.floor((new Date(warrantyEnd).getTime() - Date.now()) / 86_400_000);
+  if (days < 0)                      return 'expired';
+  if (days < WARRANTY_WARN_DAYS)     return 'soon';
+  return 'ok';
+}
+
+function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boolean }) {
+  const { assets, loading, error, addAsset, editAsset, removeAsset } = useCustomerAssets(customerId);
+  const [formOpen,  setFormOpen]  = useState(false);
+  const [editing,   setEditing]   = useState<Asset | null>(null);
+  const [deleteId,  setDeleteId]  = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  async function handleDelete(id: string) {
+    setDeleteBusy(true);
+    try { await removeAsset(id); } finally { setDeleteBusy(false); setDeleteId(null); }
+  }
+
+  if (loading) return (
+    <div className="p-4 space-y-2 animate-pulse">
+      {[1,2,3].map(i => <div key={i} className="skeleton h-12 rounded-lg" />)}
+    </div>
+  );
+
+  if (error) return (
+    <div className="p-4 flex items-center gap-2 text-sm text-red-500">
+      <AlertCircle className="size-4 shrink-0" />{error}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="px-4 py-3 flex items-center justify-between border-b border-border">
+        <p className="text-sm text-text-muted">{assets.length} asset{assets.length !== 1 ? 's' : ''}</p>
+        {canEdit && (
+          <button
+            onClick={() => { setEditing(null); setFormOpen(true); }}
+            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+          >
+            <Plus className="size-3.5" /> Add Asset
+          </button>
+        )}
+      </div>
+
+      {assets.length === 0 ? (
+        <div className="py-10 text-center text-sm text-text-muted">
+          No assets recorded for this customer.
+          {canEdit && (
+            <button onClick={() => { setEditing(null); setFormOpen(true); }} className="block mx-auto mt-2 text-accent hover:underline text-xs">
+              Add the first asset
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="divide-y divide-border">
+          {assets.map(asset => {
+            const Icon = ASSET_TYPE_ICON[asset.type] ?? Package;
+            const ws   = warrantyStatus(asset.warrantyEnd);
+            return (
+              <div key={asset.id} className="flex items-start gap-3 px-4 py-3">
+                <div className="size-8 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 mt-0.5">
+                  <Icon className="size-4 text-text-muted" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-text-primary">{asset.name}</p>
+                    <span className={cn(
+                      'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
+                      asset.status === 'active'  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+                      asset.status === 'spare'   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                                                   'bg-surface text-text-muted border border-border',
+                    )}>{asset.status}</span>
+                    {ws === 'expired' && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">Warranty expired</span>}
+                    {ws === 'soon'    && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">Warranty expiring soon</span>}
+                  </div>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {[asset.make, asset.model].filter(Boolean).join(' ')}
+                    {asset.serial && <span className="ml-1 font-mono">· {asset.serial}</span>}
+                    {asset.assignedTo && <span> · {asset.assignedTo}</span>}
+                  </p>
+                  {(asset.os || asset.warrantyEnd || asset.purchaseDate) && (
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {asset.os && <span>{asset.os}</span>}
+                      {asset.warrantyEnd && <span className={cn('ml-2', ws === 'expired' ? 'text-red-500' : ws === 'soon' ? 'text-amber-500' : '')}>· Warranty: {asset.warrantyEnd}</span>}
+                      {asset.purchaseDate && <span className="ml-2">· Purchased: {asset.purchaseDate}</span>}
+                    </p>
+                  )}
+                </div>
+                {canEdit && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => { setEditing(asset); setFormOpen(true); }} className="p-1 rounded text-text-muted hover:text-accent transition-colors">
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button onClick={() => setDeleteId(asset.id)} className="p-1 rounded text-text-muted hover:text-red-500 transition-colors">
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm bg-surface-raised border border-border rounded-card shadow-modal p-6 space-y-4">
+            <p className="text-sm font-semibold text-text-primary">Remove this asset?</p>
+            <p className="text-xs text-text-muted">This cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteId(null)} disabled={deleteBusy} className="px-3 py-1.5 text-sm rounded-lg border border-border text-text-secondary hover:text-text-primary">Cancel</button>
+              <button onClick={() => handleDelete(deleteId)} disabled={deleteBusy} className="px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600">
+                {deleteBusy ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AssetForm
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        initial={editing}
+        onSave={async p => { editing ? await editAsset(editing.id, p) : await addAsset(p); }}
+      />
+    </>
   );
 }
 
@@ -472,7 +616,7 @@ function NetworkTab({ siteId, customerId, onHealthChange }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'alerts' | 'logs' | 'backup' | 'network';
+type Tab = 'alerts' | 'logs' | 'backup' | 'network' | 'assets';
 
 export function CustomerDetailPage() {
   const { id }            = useParams<{ id: string }>();
@@ -526,6 +670,7 @@ export function CustomerDetailPage() {
     { id: 'alerts',  label: 'Alerts',      count: openAlerts.length || undefined },
     { id: 'backup',  label: 'Backup Jobs', count: failedJobs.length || undefined },
     { id: 'logs',    label: 'Logs' },
+    { id: 'assets',  label: 'Assets' },
     ...(c.integrations.unifi ? [{ id: 'network' as Tab, label: 'Network' }] : []),
   ];
 
@@ -626,6 +771,7 @@ export function CustomerDetailPage() {
               {activeTab === 'alerts'  && <AlertsTab  alerts={alerts} />}
               {activeTab === 'logs'    && <LogsTab     logs={logs} />}
               {activeTab === 'backup'  && <BackupTab   jobs={backupJobs} />}
+              {activeTab === 'assets'  && <AssetsTab   customerId={c.id} canEdit={canEdit} />}
               {activeTab === 'network' && (
                 <NetworkTab
                   siteId={c.unifiSiteId}

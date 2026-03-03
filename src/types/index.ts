@@ -75,6 +75,26 @@ export interface BackupJob {
   errorMessage?: string;
 }
 
+export type AssetType   = 'computer' | 'server' | 'network' | 'mobile' | 'printer' | 'license' | 'other';
+export type AssetStatus = 'active' | 'retired' | 'spare';
+
+export interface Asset {
+  id:           string;
+  customerId:   string;
+  name:         string;
+  type:         AssetType;
+  make?:        string;
+  model?:       string;
+  serial?:      string;
+  os?:          string;
+  assignedTo?:  string;
+  status:       AssetStatus;
+  purchaseDate?: string;   // ISO date string (date only)
+  warrantyEnd?:  string;   // ISO date string (date only)
+  notes?:       string;
+  createdAt:    string;
+}
+
 export interface NewsItem {
   id:       string;
   title:    string;

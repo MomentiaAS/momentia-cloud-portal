@@ -4,7 +4,7 @@
  */
 
 import { supabase } from './supabase';
-import type { Customer, Alert, LogEntry, BackupJob, Asset } from '../types';
+import type { Customer, Alert, LogEntry, BackupJob, Asset, CustomerDocSection } from '../types';
 import type { Profile } from '../context/AuthContext';
 
 // ── Type for the raw DB row shapes ────────────────────────────────────────────
@@ -42,6 +42,11 @@ type DbAsset = {
   ip_address: string | null; mac_address: string | null; location: string | null;
   purchase_date: string | null; warranty_end: string | null;
   notes: string | null; created_at: string;
+};
+
+type DbDocSection = {
+  id: string; customer_id: string; title: string; body: string;
+  sort_order: number; created_at: string; updated_at: string;
 };
 
 // ── Mappers ───────────────────────────────────────────────────────────────────
@@ -276,6 +281,18 @@ export async function fetchBackupJobs(): Promise<BackupJob[]> {
 
 // ── Assets ────────────────────────────────────────────────────────────────────
 
+function toDocSection(r: DbDocSection): CustomerDocSection {
+  return {
+    id:         r.id,
+    customerId: r.customer_id,
+    title:      r.title,
+    body:       r.body,
+    sortOrder:  r.sort_order,
+    createdAt:  r.created_at,
+    updatedAt:  r.updated_at,
+  };
+}
+
 function toAsset(r: DbAsset): Asset {
   return {
     id:           r.id,
@@ -378,5 +395,59 @@ export async function updateAsset(id: string, p: AssetPayload): Promise<Asset> {
 
 export async function deleteAsset(id: string): Promise<void> {
   const { error } = await supabase.from('assets').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// ── Customer documentation sections ───────────────────────────────────────────
+
+export async function fetchDocSectionsByCustomer(customerId: string): Promise<CustomerDocSection[]> {
+  const { data, error } = await supabase
+    .from('customer_doc_sections')
+    .select('*')
+    .eq('customer_id', customerId)
+    .order('sort_order', { ascending: true })
+    .order('title', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data as DbDocSection[]).map(toDocSection);
+}
+
+export interface DocSectionPayload {
+  title: string;
+  body: string;
+  sortOrder: number;
+}
+
+export async function insertDocSection(customerId: string, p: DocSectionPayload): Promise<CustomerDocSection> {
+  const { data, error } = await supabase
+    .from('customer_doc_sections')
+    .insert({
+      customer_id: customerId,
+      title:       p.title.trim() || 'Untitled',
+      body:        p.body ?? '',
+      sort_order:  p.sortOrder,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toDocSection(data as DbDocSection);
+}
+
+export async function updateDocSection(id: string, p: DocSectionPayload): Promise<CustomerDocSection> {
+  const { data, error } = await supabase
+    .from('customer_doc_sections')
+    .update({
+      title:      p.title.trim() || 'Untitled',
+      body:       p.body ?? '',
+      sort_order: p.sortOrder,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toDocSection(data as DbDocSection);
+}
+
+export async function deleteDocSection(id: string): Promise<void> {
+  const { error } = await supabase.from('customer_doc_sections').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }

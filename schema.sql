@@ -391,6 +391,63 @@ alter table public.assets add column if not exists ip_address  text;
 alter table public.assets add column if not exists mac_address text;
 alter table public.assets add column if not exists location    text;
 
+-- ── v7 → v8: Per-customer documentation sections (technical docs) ───────────
+
+create table if not exists public.customer_doc_sections (
+  id            uuid primary key default uuid_generate_v4(),
+  customer_id   uuid not null references public.customers(id) on delete cascade,
+  title         text not null,
+  body          text not null default '',
+  sort_order    integer not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists idx_customer_doc_sections_customer
+  on public.customer_doc_sections(customer_id);
+
+alter table public.customer_doc_sections enable row level security;
+
+create policy "Doc section select" on public.customer_doc_sections
+  for select using (
+    auth.uid() is not null and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or exists (
+        select 1 from public.user_customers uc
+        where uc.user_id = auth.uid() and uc.customer_id = customer_doc_sections.customer_id
+      )
+    )
+  );
+
+create policy "Doc section write" on public.customer_doc_sections
+  for all using (
+    auth.uid() is not null and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and exists (
+          select 1 from public.user_customers uc
+          where uc.user_id = auth.uid() and uc.customer_id = customer_doc_sections.customer_id
+        )
+      )
+    )
+  ) with check (auth.uid() is not null);
+
+create or replace function public.customer_doc_sections_touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_customer_doc_sections_updated_at on public.customer_doc_sections;
+create trigger trg_customer_doc_sections_updated_at
+  before update on public.customer_doc_sections
+  for each row execute procedure public.customer_doc_sections_touch_updated_at();
+
 -- ── No seed data ──────────────────────────────────────────────────────────────
 -- Add real customers via the portal.
 -- Use the portal to add customers, or insert directly via the Supabase dashboard.

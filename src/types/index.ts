@@ -78,6 +78,17 @@ export interface BackupJob {
 export type AssetType   = 'computer' | 'server' | 'network' | 'mobile' | 'printer' | 'license' | 'other';
 export type AssetStatus = 'active' | 'retired' | 'spare';
 
+/** Technical documentation section for a customer (portal-editable). */
+export interface CustomerDocSection {
+  id:         string;
+  customerId: string;
+  title:      string;
+  body:       string;
+  sortOrder:  number;
+  createdAt:  string;
+  updatedAt:  string;
+}
+
 export interface Asset {
   id:           string;
   customerId:   string;

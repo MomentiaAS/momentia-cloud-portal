@@ -7,7 +7,7 @@ const STORAGE_BUCKET = 'customer-doc-media';
  * don't count as user edits for dirty-state comparison.
  */
 export function canonicalDocHtmlForCompare(html: string): string {
-  let h = html?.trim() ?? '';
+  let h = (html ?? '').trim();
 
   // TipTap / ProseMirror noise
   h = h

@@ -1,4 +1,5 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import {
   AlertCircle, BookOpen, Eye, FileText, Pencil, Plus, Save, Trash2,
 } from 'lucide-react';
@@ -61,33 +62,45 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
   const selected = sections.find(s => s.id === selectedId) ?? null;
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
 
-  // Pick first section when list loads or selection missing
+  /** Keep draft/baseline in lockstep with selection in one commit so TipTap (keyed by id) never mounts with the previous section's HTML. */
+  const applySection = useCallback((id: string | null, row?: { title: string; body: string }) => {
+    if (id == null) {
+      flushSync(() => {
+        setSelectedId(null);
+        setDraftTitle('');
+        setDraftBody('');
+        setBaseline(null);
+      });
+      return;
+    }
+    const s = row ?? sectionsRef.current.find(x => x.id === id);
+    if (!s) return;
+    const body = s.body ?? '';
+    flushSync(() => {
+      setSelectedId(id);
+      setDraftTitle(s.title);
+      setDraftBody(body);
+      setBaseline({ title: s.title, body });
+    });
+  }, []);
+
+  // When the section list changes: resolve selection + sync draft in the same commit (avoid stale body on new mount).
   useEffect(() => {
     if (sections.length === 0) {
-      setSelectedId(null);
+      applySection(null);
       return;
     }
-    setSelectedId(prev => {
-      if (prev && sections.some(s => s.id === prev)) return prev;
-      return sections[0].id;
-    });
-  }, [sections]);
-
-  // Sync draft + baseline when switching section (layout effect avoids flash of wrong body in editor)
-  useLayoutEffect(() => {
-    if (!selectedId) {
-      setDraftTitle('');
-      setDraftBody('');
-      setBaseline(null);
-      return;
+    const prev = selectedIdRef.current;
+    const resolved =
+      prev !== null && sections.some(s => s.id === prev) ? prev : sections[0].id;
+    if (resolved !== prev) {
+      const row = sections.find(x => x.id === resolved);
+      if (row) applySection(resolved, row);
     }
-    const s = sectionsRef.current.find(x => x.id === selectedId);
-    if (!s) return;
-    setDraftTitle(s.title);
-    setDraftBody(s.body);
-    setBaseline({ title: s.title, body: s.body });
-  }, [selectedId]);
+  }, [sections, applySection]);
 
   const dirty = useMemo(() => {
     if (!baseline) return false;
@@ -107,9 +120,9 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
       if (dirty) {
         if (!window.confirm('You have unsaved changes. Discard them?')) return;
       }
-      setSelectedId(id);
+      applySection(id);
     },
-    [dirty, selectedId],
+    [dirty, selectedId, applySection],
   );
 
   async function handleSave() {
@@ -133,7 +146,10 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     setAddBusy(true);
     try {
       const created = await addSection();
-      setSelectedId(created.id);
+      applySection(created.id, {
+        title: created.title,
+        body: created.body ?? '',
+      });
       if (canEdit) setMode('edit');
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Could not add section');

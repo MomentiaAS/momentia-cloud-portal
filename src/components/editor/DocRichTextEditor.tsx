@@ -57,6 +57,60 @@ async function insertImageFromFile(
   }
 }
 
+/**
+ * When clipboard has both HTML (e.g. OneNote/Word table) and a PNG screenshot, we must
+ * prefer HTML so the table stays editable — otherwise our image handler wins and pastes a picture.
+ */
+function shouldLetEditorParseHtmlPaste(html: string, plain: string): boolean {
+  const t = html?.trim() ?? '';
+  if (t.length === 0) return false;
+
+  const h = t.toLowerCase();
+
+  if (
+    /<table[\s>]/.test(h) ||
+    /<thead[\s>]/.test(h) ||
+    /<tbody[\s>]/.test(h) ||
+    /<tr[\s>]/.test(h) ||
+    /<td[\s>]/.test(h) ||
+    /<th[\s>]/.test(h)
+  ) {
+    return true;
+  }
+  if (/<ul[\s>]/.test(h) || /<ol[\s>]/.test(h)) {
+    return true;
+  }
+
+  // OneNote / Word often put real structure here plus a duplicate bitmap on the clipboard.
+  if (
+    h.includes('xmlns:m') ||
+    h.includes('xmlns:o') ||
+    h.includes('urn:schemas-microsoft-com') ||
+    h.includes('office:word') ||
+    h.includes('microsoft-com:office') ||
+    h.includes('onenote')
+  ) {
+    if (isClipboardHtmlOnlySingleImage(t)) return false;
+    return true;
+  }
+
+  // Excel and similar: TSV/plain grid + HTML wrapper
+  const p = plain ?? '';
+  if (p.includes('\t') && p.split(/\n/).filter(line => line.trim()).length >= 2 && t.length > 40) {
+    return true;
+  }
+
+  return false;
+}
+
+/** True when CF_HTML is essentially one raster image (no table to edit — use file upload path). */
+function isClipboardHtmlOnlySingleImage(html: string): boolean {
+  const h = html.toLowerCase();
+  if (/<table[\s>]|<tr[\s>]|<td[\s>]|<th[\s>]/.test(h)) return false;
+  const imgs = html.match(/<img\b/gi);
+  return imgs !== null && imgs.length === 1;
+}
+
 export function DocRichTextEditor({
   value,
   onChange,
@@ -106,7 +160,16 @@ export function DocRichTextEditor({
           class: 'prose-doc',
         },
         handlePaste(_view, event) {
-          const items = event.clipboardData?.items;
+          const cd = event.clipboardData;
+          if (!cd) return false;
+
+          const html = cd.getData('text/html');
+          const plain = cd.getData('text/plain');
+          if (shouldLetEditorParseHtmlPaste(html, plain)) {
+            return false;
+          }
+
+          const items = cd.items;
           if (!items) return false;
           for (const item of items) {
             if (item.type.startsWith('image/')) {

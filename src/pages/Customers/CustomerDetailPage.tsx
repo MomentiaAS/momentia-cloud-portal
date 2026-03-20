@@ -642,10 +642,10 @@ export function CustomerDetailPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[1,2,3,4].map(i => <div key={i} className="skeleton h-20 rounded-xl" />)}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 skeleton h-64 rounded-xl" />
-          <div className="skeleton h-64 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-32 rounded-xl" />)}
         </div>
+        <div className="skeleton h-64 rounded-xl w-full" />
       </div>
     );
   }
@@ -738,126 +738,117 @@ export function CustomerDetailPage() {
         />
       </div>
 
-      {/* Main body: tabbed content + side panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+      {/* Contacts, integrations, assigned users — full-width row above tabs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+        {/* Contacts */}
+        <Card>
+          <CardHeader title="Contacts" />
+          <CardBody className="space-y-4">
+            <ContactCard title="Primary Contact"   contact={c.primaryContact} />
+            <ContactCard title="Secondary Contact" contact={c.billingContact} />
+            {!c.primaryContact?.name && !c.primaryContact?.email && (
+              <p className="text-sm text-text-muted">No contacts recorded.</p>
+            )}
+          </CardBody>
+        </Card>
 
-        {/* Tabbed content */}
-        <div className="lg:col-span-2">
-          <Card>
-            {/* Tab bar */}
-            <div className="flex border-b border-border px-4 gap-1 pt-2">
-              {TABS.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors -mb-px',
-                    activeTab === tab.id
-                      ? 'text-accent border-b-2 border-accent'
-                      : 'text-text-muted hover:text-text-primary',
-                  )}
-                >
-                  {tab.label}
-                  {tab.count != null && tab.count > 0 && (
-                    <span className="inline-flex items-center justify-center size-4 rounded-full bg-accent text-white text-[10px] font-bold">
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <CardBody className="p-0">
-              {activeTab === 'alerts'  && <AlertsTab  alerts={alerts} />}
-              {activeTab === 'logs'    && <LogsTab     logs={logs} />}
-              {activeTab === 'backup'  && <BackupTab   jobs={backupJobs} />}
-              {activeTab === 'assets'  && <AssetsTab   customerId={c.id} canEdit={canEdit} />}
-              {activeTab === 'network' && (
-                <NetworkTab
-                  siteId={c.unifiSiteId}
-                  customerId={c.id}
-                  onHealthChange={setHealthOverride}
-                />
-              )}
-            </CardBody>
-          </Card>
-        </div>
-
-        {/* Side panel */}
-        <div className="space-y-4">
-
-          {/* Contacts */}
-          <Card>
-            <CardHeader title="Contacts" />
-            <CardBody className="space-y-4">
-              <ContactCard title="Primary Contact"   contact={c.primaryContact} />
-              <ContactCard title="Secondary Contact" contact={c.billingContact} />
-              {!c.primaryContact?.name && !c.primaryContact?.email && (
-                <p className="text-sm text-text-muted">No contacts recorded.</p>
-              )}
-            </CardBody>
-          </Card>
-
-          {/* Integrations */}
-          <Card>
-            <CardHeader title="Integrations" />
-            <CardBody className="space-y-1.5">
-              {INTEGRATION_META.map(({ key, label, icon: Icon }) => (
+        {/* Integrations — enabled only */}
+        <Card>
+          <CardHeader title="Integrations" />
+          <CardBody className="space-y-1.5">
+            {activeInteg.length === 0 ? (
+              <p className="text-sm text-text-muted">No integrations enabled.</p>
+            ) : (
+              activeInteg.map(({ key, label, icon: Icon }) => (
                 <div key={key} className="flex items-center gap-2.5">
-                  <div className={cn(
-                    'size-7 rounded-lg flex items-center justify-center shrink-0',
-                    c.integrations[key] ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-surface',
-                  )}>
-                    <Icon className={cn('size-3.5', c.integrations[key] ? 'text-emerald-500' : 'text-text-muted')} />
+                  <div className="size-7 rounded-lg flex items-center justify-center shrink-0 bg-emerald-100 dark:bg-emerald-900/30">
+                    <Icon className="size-3.5 text-emerald-500" />
                   </div>
-                  <span className={cn('text-sm', c.integrations[key] ? 'text-text-primary font-medium' : 'text-text-muted line-through')}>
-                    {label}
-                  </span>
-                  {c.integrations[key]
-                    ? <CheckCircle2 className="size-3.5 text-emerald-500 ml-auto" />
-                    : <span className="text-xs text-text-muted ml-auto">Off</span>
-                  }
+                  <span className="text-sm text-text-primary font-medium">{label}</span>
+                  <CheckCircle2 className="size-3.5 text-emerald-500 ml-auto" />
                 </div>
-              ))}
-            </CardBody>
-          </Card>
+              ))
+            )}
+          </CardBody>
+        </Card>
 
-          {/* Assigned users */}
-          {assignedUsers.length > 0 && (
-            <Card>
-              <CardHeader title="Assigned Users" />
-              <CardBody className="space-y-2">
-                {assignedUsers.map(u => {
-                  const RoleIcon = roleIcon[u.role];
-                  return (
-                    <div key={u.id} className="flex items-center gap-2.5">
-                      <Avatar name={u.name ?? u.email} size="sm" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text-primary truncate">{u.name ?? u.email}</p>
-                        <p className="text-xs text-text-muted truncate">{u.email}</p>
-                      </div>
-                      <span className={cn('inline-flex items-center gap-1 text-xs font-medium shrink-0', roleColor[u.role])}>
-                        <RoleIcon className="size-3" />
-                        <span className="capitalize">{u.role}</span>
-                      </span>
+        {/* Assigned users */}
+        <Card>
+          <CardHeader title="Assigned Users" />
+          <CardBody className="space-y-2">
+            {assignedUsers.length === 0 ? (
+              <p className="text-sm text-text-muted">No users assigned.</p>
+            ) : (
+              assignedUsers.map(u => {
+                const RoleIcon = roleIcon[u.role];
+                return (
+                  <div key={u.id} className="flex items-center gap-2.5">
+                    <Avatar name={u.name ?? u.email} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">{u.name ?? u.email}</p>
+                      <p className="text-xs text-text-muted truncate">{u.email}</p>
                     </div>
-                  );
-                })}
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Notes */}
-          {c.notes && (
-            <Card>
-              <CardHeader title="Notes" />
-              <CardBody>
-                <p className="text-sm text-text-secondary whitespace-pre-wrap">{c.notes}</p>
-              </CardBody>
-            </Card>
-          )}
-        </div>
+                    <span className={cn('inline-flex items-center gap-1 text-xs font-medium shrink-0', roleColor[u.role])}>
+                      <RoleIcon className="size-3" />
+                      <span className="capitalize">{u.role}</span>
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </CardBody>
+        </Card>
       </div>
+
+      {/* Full-width tabbed content */}
+      <Card>
+        {/* Tab bar */}
+        <div className="flex border-b border-border px-4 gap-1 pt-2 flex-wrap">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors -mb-px',
+                activeTab === tab.id
+                  ? 'text-accent border-b-2 border-accent'
+                  : 'text-text-muted hover:text-text-primary',
+              )}
+            >
+              {tab.label}
+              {tab.count != null && tab.count > 0 && (
+                <span className="inline-flex items-center justify-center size-4 rounded-full bg-accent text-white text-[10px] font-bold">
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <CardBody className="p-0">
+          {activeTab === 'alerts'  && <AlertsTab  alerts={alerts} />}
+          {activeTab === 'logs'    && <LogsTab     logs={logs} />}
+          {activeTab === 'backup'  && <BackupTab   jobs={backupJobs} />}
+          {activeTab === 'assets'  && <AssetsTab   customerId={c.id} canEdit={canEdit} />}
+          {activeTab === 'network' && (
+            <NetworkTab
+              siteId={c.unifiSiteId}
+              customerId={c.id}
+              onHealthChange={setHealthOverride}
+            />
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Notes */}
+      {c.notes && (
+        <Card>
+          <CardHeader title="Notes" />
+          <CardBody>
+            <p className="text-sm text-text-secondary whitespace-pre-wrap">{c.notes}</p>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Edit form */}
       {editOpen && (

@@ -2,6 +2,51 @@ import DOMPurify from 'dompurify';
 
 const STORAGE_BUCKET = 'customer-doc-media';
 
+/**
+ * Normalize editor HTML so TipTap/DB string differences (whitespace, trailing breaks)
+ * don't count as user edits for dirty-state comparison.
+ */
+export function canonicalDocHtmlForCompare(html: string): string {
+  let h = html?.trim() ?? '';
+
+  // TipTap / ProseMirror noise
+  h = h
+    .replace(/<br\s+class="ProseMirror-trailingBreak"[^>]*\/?>/gi, '')
+    .replace(/<br\s+class=['"]ProseMirror-trailingBreak['"][^>]*\/?>/gi, '');
+
+  if (!h || h === '<p></p>' || h === '<p><br></p>') {
+    return '';
+  }
+
+  if (typeof document === 'undefined') {
+    return h.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+  }
+
+  try {
+    const doc = new DOMParser().parseFromString(`<div id="cmp">${h}</div>`, 'text/html');
+    const root = doc.getElementById('cmp');
+    if (!root) {
+      return h.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+    }
+    let out = root.innerHTML
+      .replace(/\s*\n\s*/g, '')
+      .replace(/>\s+</g, '><')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    out = out
+      .replace(/<p><\/p>/gi, '')
+      .replace(/<p>\s*<\/p>/gi, '');
+    return out || '';
+  } catch {
+    return h.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+  }
+}
+
+export function normalizeDocTitle(title: string): string {
+  return title.trim() || 'Untitled';
+}
+
 /** Escape plain text and wrap as HTML paragraphs (legacy sections saved as plain text). */
 export function normalizeBodyForEditor(raw: string): string {
   const t = raw?.trim() ?? '';

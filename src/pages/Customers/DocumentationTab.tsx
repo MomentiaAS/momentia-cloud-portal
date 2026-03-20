@@ -9,7 +9,12 @@ import { useCustomerDocumentation } from '../../hooks/useCustomerDocumentation';
 import type { CustomerDocSection } from '../../types';
 import { DocRichTextEditor } from '../../components/editor/DocRichTextEditor';
 import '../../components/editor/doc-editor.css';
-import { normalizeBodyForEditor, sanitizeCustomerDocHtml } from '../../lib/docHtml';
+import {
+  normalizeBodyForEditor,
+  sanitizeCustomerDocHtml,
+  canonicalDocHtmlForCompare,
+  normalizeDocTitle,
+} from '../../lib/docHtml';
 
 type EditorMode = 'edit' | 'preview';
 
@@ -46,7 +51,8 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftBody, setDraftBody] = useState('');
-  const [dirty, setDirty] = useState(false);
+  /** Last persisted snapshot for the current section — dirty = draft differs (canonical compare for HTML). */
+  const [baseline, setBaseline] = useState<{ title: string; body: string } | null>(null);
   const [mode, setMode] = useState<EditorMode>(canEdit ? 'edit' : 'preview');
   const [saveBusy, setSaveBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -68,20 +74,28 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     });
   }, [sections]);
 
-  // Sync draft when switching section (layout effect avoids flash of wrong body in editor)
+  // Sync draft + baseline when switching section (layout effect avoids flash of wrong body in editor)
   useLayoutEffect(() => {
     if (!selectedId) {
       setDraftTitle('');
       setDraftBody('');
-      setDirty(false);
+      setBaseline(null);
       return;
     }
     const s = sectionsRef.current.find(x => x.id === selectedId);
     if (!s) return;
     setDraftTitle(s.title);
     setDraftBody(s.body);
-    setDirty(false);
+    setBaseline({ title: s.title, body: s.body });
   }, [selectedId]);
+
+  const dirty = useMemo(() => {
+    if (!baseline) return false;
+    const titleChanged = normalizeDocTitle(draftTitle) !== normalizeDocTitle(baseline.title);
+    const bodyChanged =
+      canonicalDocHtmlForCompare(draftBody) !== canonicalDocHtmlForCompare(baseline.body);
+    return titleChanged || bodyChanged;
+  }, [baseline, draftTitle, draftBody]);
 
   useEffect(() => {
     if (!canEdit) setMode('preview');
@@ -103,7 +117,10 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     setSaveBusy(true);
     try {
       await saveSection(selected.id, sectionPayload(selected, draftTitle, draftBody));
-      setDirty(false);
+      setBaseline({
+        title: normalizeDocTitle(draftTitle),
+        body: draftBody,
+      });
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -117,9 +134,6 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     try {
       const created = await addSection();
       setSelectedId(created.id);
-      setDraftTitle(created.title);
-      setDraftBody(created.body);
-      setDirty(false);
       if (canEdit) setMode('edit');
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Could not add section');
@@ -134,7 +148,6 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     setDeleteBusy(true);
     try {
       await removeSection(selected.id);
-      setDirty(false);
       await reload();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Delete failed');
@@ -229,7 +242,7 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
                 <input
                   type="text"
                   value={draftTitle}
-                  onChange={e => { setDraftTitle(e.target.value); setDirty(true); }}
+                  onChange={e => { setDraftTitle(e.target.value); }}
                   className="flex-1 min-w-[120px] text-sm font-semibold text-text-primary bg-transparent border border-border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent/30"
                   placeholder="Section title"
                   disabled={!showEditor}
@@ -296,7 +309,7 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
                 <DocRichTextEditor
                   key={selectedId}
                   value={normalizeBodyForEditor(draftBody)}
-                  onChange={html => { setDraftBody(html); setDirty(true); }}
+                  onChange={setDraftBody}
                   customerId={customerId}
                   sectionId={selected.id}
                   editable

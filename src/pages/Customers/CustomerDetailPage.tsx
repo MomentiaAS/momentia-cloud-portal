@@ -23,6 +23,7 @@ import { updateCustomer } from '../../lib/db';
 import { CustomerForm } from './CustomerForm';
 import { AssetForm } from '../Assets/AssetForm';
 import { DocumentationTab } from './DocumentationTab';
+import { CustomerFilesTab } from './CustomerFilesTab';
 import type { Customer, Alert, BackupJob, LogEntry, Asset } from '../../types';
 import type { HealthStatus, Severity } from '../../types';
 import type { UserRole } from '../../context/AuthContext';
@@ -617,7 +618,7 @@ function NetworkTab({ siteId, customerId, onHealthChange }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'alerts' | 'logs' | 'backup' | 'network' | 'assets' | 'docs';
+type Tab = 'alerts' | 'logs' | 'backup' | 'network' | 'assets' | 'docs' | 'files';
 
 export function CustomerDetailPage() {
   const { id }            = useParams<{ id: string }>();
@@ -673,6 +674,7 @@ export function CustomerDetailPage() {
     { id: 'logs',    label: 'Logs' },
     { id: 'assets',  label: 'Assets' },
     { id: 'docs',    label: 'Documentation' },
+    { id: 'files',   label: 'Files' },
     ...(c.integrations.unifi ? [{ id: 'network' as Tab, label: 'Network' }] : []),
   ];
 
@@ -833,6 +835,7 @@ export function CustomerDetailPage() {
           {activeTab === 'backup'  && <BackupTab   jobs={backupJobs} />}
           {activeTab === 'assets'  && <AssetsTab   customerId={c.id} canEdit={canEdit} />}
           {activeTab === 'docs'    && <DocumentationTab customerId={c.id} canEdit={canEdit} />}
+          {activeTab === 'files'   && <CustomerFilesTab  customerId={c.id} canEdit={canEdit} />}
           {activeTab === 'network' && (
             <NetworkTab
               siteId={c.unifiSiteId}

@@ -500,6 +500,140 @@ create policy "customer-doc-media delete"
     )
   );
 
+-- ── v9 → v10: Customer file library (DB + private Storage) ───────────────────
+
+create table if not exists public.customer_files (
+  id            uuid primary key default uuid_generate_v4(),
+  customer_id   uuid not null references public.customers(id) on delete cascade,
+  parent_id     uuid references public.customer_files(id) on delete cascade,
+  kind          text not null check (kind in ('folder', 'file')),
+  name          text not null,
+  storage_path  text,
+  mime_type     text,
+  size_bytes    bigint,
+  created_at    timestamptz not null default now(),
+  created_by    uuid references public.profiles(id) on delete set null,
+  constraint customer_files_storage_path_by_kind check (
+    (kind = 'folder' and storage_path is null)
+    or (kind = 'file' and storage_path is not null and length(trim(storage_path)) > 0)
+  )
+);
+
+create index if not exists idx_customer_files_customer_parent
+  on public.customer_files (customer_id, parent_id);
+
+create unique index if not exists idx_customer_files_sibling_name
+  on public.customer_files (customer_id, parent_id, lower(trim(name)))
+  nulls not distinct;
+
+alter table public.customer_files enable row level security;
+
+drop policy if exists "Customer file select" on public.customer_files;
+create policy "Customer file select" on public.customer_files
+  for select using (
+    auth.uid() is not null and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or exists (
+        select 1 from public.user_customers uc
+        where uc.user_id = auth.uid() and uc.customer_id = customer_files.customer_id
+      )
+    )
+  );
+
+drop policy if exists "Customer file write" on public.customer_files;
+create policy "Customer file write" on public.customer_files
+  for all using (
+    auth.uid() is not null and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and exists (
+          select 1 from public.user_customers uc
+          where uc.user_id = auth.uid() and uc.customer_id = customer_files.customer_id
+        )
+      )
+    )
+  ) with check (auth.uid() is not null);
+
+-- Private bucket; use signed URLs in the app for downloads
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'customer-files',
+  'customer-files',
+  false,
+  52428800,
+  null
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "customer-files select" on storage.objects;
+create policy "customer-files select"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'customer-files'
+    and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (storage.foldername(name))[1] in (
+        select customer_id::text from public.user_customers
+        where user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "customer-files insert" on storage.objects;
+create policy "customer-files insert"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'customer-files'
+    and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and (storage.foldername(name))[1] in (
+          select customer_id::text from public.user_customers
+          where user_id = auth.uid()
+        )
+      )
+    )
+  );
+
+drop policy if exists "customer-files update" on storage.objects;
+create policy "customer-files update"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'customer-files'
+    and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and (storage.foldername(name))[1] in (
+          select customer_id::text from public.user_customers
+          where user_id = auth.uid()
+        )
+      )
+    )
+  );
+
+drop policy if exists "customer-files delete" on storage.objects;
+create policy "customer-files delete"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'customer-files'
+    and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and (storage.foldername(name))[1] in (
+          select customer_id::text from public.user_customers
+          where user_id = auth.uid()
+        )
+      )
+    )
+  );
+
 -- ── No seed data ──────────────────────────────────────────────────────────────
 -- Add real customers via the portal.
 -- Use the portal to add customers, or insert directly via the Supabase dashboard.

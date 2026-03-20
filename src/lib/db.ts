@@ -4,7 +4,15 @@
  */
 
 import { supabase } from './supabase';
-import type { Customer, Alert, LogEntry, BackupJob, Asset, CustomerDocSection } from '../types';
+import type {
+  Customer,
+  Alert,
+  LogEntry,
+  BackupJob,
+  Asset,
+  CustomerDocSection,
+  CustomerFileNode,
+} from '../types';
 import type { Profile } from '../context/AuthContext';
 
 // ── Type for the raw DB row shapes ────────────────────────────────────────────
@@ -48,6 +56,15 @@ type DbDocSection = {
   id: string; customer_id: string; title: string; body: string;
   sort_order: number; created_at: string; updated_at: string;
 };
+
+type DbCustomerFile = {
+  id: string; customer_id: string; parent_id: string | null; kind: string;
+  name: string; storage_path: string | null; mime_type: string | null;
+  size_bytes: number | null; created_at: string; created_by: string | null;
+};
+
+const CUSTOMER_FILES_BUCKET = 'customer-files';
+const MAX_CUSTOMER_FILE_BYTES = 50 * 1024 * 1024;
 
 // ── Mappers ───────────────────────────────────────────────────────────────────
 
@@ -293,6 +310,21 @@ function toDocSection(r: DbDocSection): CustomerDocSection {
   };
 }
 
+function toCustomerFile(r: DbCustomerFile): CustomerFileNode {
+  return {
+    id:          r.id,
+    customerId:  r.customer_id,
+    parentId:    r.parent_id,
+    kind:        r.kind as CustomerFileNode['kind'],
+    name:        r.name,
+    storagePath: r.storage_path ?? undefined,
+    mimeType:    r.mime_type ?? undefined,
+    sizeBytes:   r.size_bytes ?? undefined,
+    createdAt:   r.created_at,
+    createdBy:   r.created_by ?? undefined,
+  };
+}
+
 function toAsset(r: DbAsset): Asset {
   return {
     id:           r.id,
@@ -450,4 +482,148 @@ export async function updateDocSection(id: string, p: DocSectionPayload): Promis
 export async function deleteDocSection(id: string): Promise<void> {
   const { error } = await supabase.from('customer_doc_sections').delete().eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+// ── Customer files (folders + Storage-backed files) ───────────────────────────
+
+function sanitizePathSegment(name: string): string {
+  const t = name.replace(/^.*[/\\]/, '').trim() || 'file';
+  const safe = t.replace(/[^\w.\-]+/g, '_').slice(0, 120);
+  return safe || 'file';
+}
+
+function displayFileName(file: File): string {
+  const t = file.name.replace(/^.*[/\\]/, '').trim();
+  return t.slice(0, 500) || 'file';
+}
+
+/** All nodes for a customer (client builds folder view by parentId). */
+export async function fetchCustomerFiles(customerId: string): Promise<CustomerFileNode[]> {
+  const { data, error } = await supabase
+    .from('customer_files')
+    .select('*')
+    .eq('customer_id', customerId);
+  if (error) throw new Error(error.message);
+  const rows = (data as DbCustomerFile[]).map(toCustomerFile);
+  return rows.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+}
+
+export async function insertCustomerFolder(
+  customerId: string,
+  parentId: string | null,
+  name: string,
+): Promise<CustomerFileNode> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Folder name is required.');
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id ?? null;
+
+  const { data, error } = await supabase
+    .from('customer_files')
+    .insert({
+      customer_id:   customerId,
+      parent_id:     parentId,
+      kind:          'folder',
+      name:          trimmed,
+      storage_path:  null,
+      mime_type:     null,
+      size_bytes:    null,
+      created_by:    uid,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toCustomerFile(data as DbCustomerFile);
+}
+
+export async function uploadCustomerLibraryFile(
+  customerId: string,
+  parentId: string | null,
+  file: File,
+): Promise<CustomerFileNode> {
+  if (file.size > MAX_CUSTOMER_FILE_BYTES) {
+    throw new Error('File is too large (max 50 MB).');
+  }
+
+  const displayName = displayFileName(file);
+  const segment = sanitizePathSegment(file.name);
+  const objectId = crypto.randomUUID();
+  const storagePath = `${customerId}/${objectId}/${segment}`;
+
+  const { error: upErr } = await supabase.storage
+    .from(CUSTOMER_FILES_BUCKET)
+    .upload(storagePath, file, {
+      upsert: false,
+      contentType: file.type || 'application/octet-stream',
+    });
+  if (upErr) throw new Error(upErr.message);
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id ?? null;
+
+  const { data, error } = await supabase
+    .from('customer_files')
+    .insert({
+      customer_id:   customerId,
+      parent_id:     parentId,
+      kind:          'file',
+      name:          displayName,
+      storage_path:  storagePath,
+      mime_type:     file.type || null,
+      size_bytes:    file.size,
+      created_by:    uid,
+    })
+    .select()
+    .single();
+  if (error) {
+    await supabase.storage.from(CUSTOMER_FILES_BUCKET).remove([storagePath]);
+    throw new Error(error.message);
+  }
+  return toCustomerFile(data as DbCustomerFile);
+}
+
+function collectStoragePathsInSubtree(all: CustomerFileNode[], rootId: string): string[] {
+  const byParent = new Map<string | null, CustomerFileNode[]>();
+  for (const n of all) {
+    const p = n.parentId ?? null;
+    if (!byParent.has(p)) byParent.set(p, []);
+    byParent.get(p)!.push(n);
+  }
+  const paths: string[] = [];
+  function walk(id: string) {
+    const node = all.find(x => x.id === id);
+    if (!node) return;
+    if (node.kind === 'file' && node.storagePath) paths.push(node.storagePath);
+    for (const k of byParent.get(id) ?? []) walk(k.id);
+  }
+  walk(rootId);
+  return paths;
+}
+
+/** Removes Storage objects for all file descendants, then deletes the row (CASCADE removes child rows). */
+export async function deleteCustomerFileNode(customerId: string, nodeId: string): Promise<void> {
+  const all = await fetchCustomerFiles(customerId);
+  const exists = all.some(n => n.id === nodeId);
+  if (!exists) throw new Error('Item not found.');
+
+  const paths = collectStoragePathsInSubtree(all, nodeId);
+  if (paths.length > 0) {
+    const { error: stErr } = await supabase.storage.from(CUSTOMER_FILES_BUCKET).remove(paths);
+    if (stErr) throw new Error(stErr.message);
+  }
+
+  const { error } = await supabase.from('customer_files').delete().eq('id', nodeId);
+  if (error) throw new Error(error.message);
+}
+
+export async function getCustomerFileSignedUrl(storagePath: string, expiresSec = 3600): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(CUSTOMER_FILES_BUCKET)
+    .createSignedUrl(storagePath, expiresSec);
+  if (error) throw new Error(error.message);
+  if (!data?.signedUrl) throw new Error('Could not create download link.');
+  return data.signedUrl;
 }

@@ -79,6 +79,22 @@ export type AssetType   = 'computer' | 'server' | 'network' | 'mobile' | 'printe
 export type AssetStatus = 'active' | 'retired' | 'spare';
 
 /** Technical documentation section for a customer (portal-editable). */
+export type CustomerFileKind = 'folder' | 'file';
+
+/** Folder or file row under a customer (files reference Storage via storagePath). */
+export interface CustomerFileNode {
+  id:          string;
+  customerId:  string;
+  parentId:    string | null;
+  kind:        CustomerFileKind;
+  name:        string;
+  storagePath?: string;
+  mimeType?:   string;
+  sizeBytes?:  number;
+  createdAt:   string;
+  createdBy?:  string;
+}
+
 export interface CustomerDocSection {
   id:         string;
   customerId: string;

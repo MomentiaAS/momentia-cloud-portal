@@ -1,0 +1,129 @@
+/* TipTap / ProseMirror — customer documentation WYSIWYG */
+
+.doc-editor-root .doc-editor-toolbar {
+  @apply flex flex-wrap items-center gap-1 p-2 border-b border-border bg-surface/80 shrink-0;
+}
+
+.doc-editor-root .doc-editor-toolbar button {
+  @apply p-1.5 rounded-md text-text-secondary hover:bg-surface-overlay hover:text-text-primary disabled:opacity-40 disabled:pointer-events-none transition-colors;
+}
+
+.doc-editor-root .doc-editor-toolbar button.is-active {
+  @apply bg-accent/20 text-accent;
+}
+
+.doc-editor-root .doc-editor-content {
+  @apply flex-1 min-h-[240px] max-h-[min(480px,50vh)] overflow-y-auto rounded-lg border border-border bg-surface px-3 py-2;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror {
+  @apply min-h-[220px] text-sm text-text-primary outline-none;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-text-muted float-left h-0 pointer-events-none;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror h2 {
+  @apply text-lg font-bold mt-4 mb-2 text-text-primary;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror h3 {
+  @apply text-base font-semibold mt-3 mb-1.5 text-text-primary;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror ul {
+  @apply list-disc pl-6 my-2;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror ol {
+  @apply list-decimal pl-6 my-2;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror blockquote {
+  @apply border-l-4 border-border pl-3 my-2 text-text-secondary italic;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror hr {
+  @apply border-border my-4;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror code {
+  @apply font-mono text-xs bg-surface-overlay px-1 py-0.5 rounded text-accent;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror pre {
+  @apply font-mono text-xs bg-surface-overlay border border-border rounded-lg p-3 my-2 overflow-x-auto;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror a {
+  @apply text-accent underline underline-offset-2;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror img {
+  @apply max-w-full h-auto rounded-lg my-2 border border-border;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror table {
+  @apply border-collapse w-full my-3 text-xs;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror th,
+.doc-editor-root .doc-editor-content .ProseMirror td {
+  @apply border border-border px-2 py-1.5 align-top;
+}
+
+.doc-editor-root .doc-editor-content .ProseMirror th {
+  @apply bg-surface-overlay font-semibold text-text-primary;
+}
+
+/* Sanitized preview (read-only) — same typography */
+.doc-html-preview {
+  @apply text-sm text-text-primary bg-surface border border-border rounded-lg px-3 py-2 min-h-[240px] max-h-[min(480px,50vh)] overflow-y-auto;
+}
+
+.doc-html-preview h2 {
+  @apply text-lg font-bold mt-4 mb-2;
+}
+
+.doc-html-preview h3 {
+  @apply text-base font-semibold mt-3 mb-1.5;
+}
+
+.doc-html-preview ul {
+  @apply list-disc pl-6 my-2;
+}
+
+.doc-html-preview ol {
+  @apply list-decimal pl-6 my-2;
+}
+
+.doc-html-preview blockquote {
+  @apply border-l-4 border-border pl-3 my-2 text-text-secondary italic;
+}
+
+.doc-html-preview hr {
+  @apply border-border my-4;
+}
+
+.doc-html-preview a {
+  @apply text-accent underline underline-offset-2;
+}
+
+.doc-html-preview img {
+  @apply max-w-full h-auto rounded-lg my-2 border border-border;
+}
+
+.doc-html-preview table {
+  @apply border-collapse w-full my-3 text-xs;
+}
+
+.doc-html-preview th,
+.doc-html-preview td {
+  @apply border border-border px-2 py-1.5 align-top;
+}
+
+.doc-html-preview th {
+  @apply bg-surface-overlay font-semibold;
+}

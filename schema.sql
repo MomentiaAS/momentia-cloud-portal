@@ -448,6 +448,58 @@ create trigger trg_customer_doc_sections_updated_at
   before update on public.customer_doc_sections
   for each row execute procedure public.customer_doc_sections_touch_updated_at();
 
+-- ── v8 → v9: Storage for documentation images (public URLs, scoped uploads) ───
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'customer-doc-media',
+  'customer-doc-media',
+  true,
+  5242880,
+  array['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- Read: public bucket — objects reachable only if URL is known
+create policy "customer-doc-media read"
+  on storage.objects for select
+  using (bucket_id = 'customer-doc-media');
+
+create policy "customer-doc-media insert"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'customer-doc-media'
+    and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and (storage.foldername(name))[1] in (
+          select customer_id::text from public.user_customers
+          where user_id = auth.uid()
+        )
+      )
+    )
+  );
+
+create policy "customer-doc-media delete"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'customer-doc-media'
+    and (
+      public.current_user_role() in ('superadmin', 'admin')
+      or (
+        public.current_user_role() = 'technician'
+        and (storage.foldername(name))[1] in (
+          select customer_id::text from public.user_customers
+          where user_id = auth.uid()
+        )
+      )
+    )
+  );
+
 -- ── No seed data ──────────────────────────────────────────────────────────────
 -- Add real customers via the portal.
 -- Use the portal to add customers, or insert directly via the Supabase dashboard.

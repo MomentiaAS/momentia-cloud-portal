@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import {
   AlertCircle, BookOpen, Eye, FileText, Pencil, Plus, Save, Trash2,
 } from 'lucide-react';
@@ -7,11 +7,29 @@ import { Button } from '../../components/ui/Button';
 import { cn } from '../../components/ui/cn';
 import { useCustomerDocumentation } from '../../hooks/useCustomerDocumentation';
 import type { CustomerDocSection } from '../../types';
+import { DocRichTextEditor } from '../../components/editor/DocRichTextEditor';
+import '../../components/editor/doc-editor.css';
+import { normalizeBodyForEditor, sanitizeCustomerDocHtml } from '../../lib/docHtml';
 
 type EditorMode = 'edit' | 'preview';
 
 function sectionPayload(s: CustomerDocSection, title: string, body: string) {
   return { title: title.trim() || 'Untitled', body, sortOrder: s.sortOrder };
+}
+
+function DocHtmlPreview({ html }: { html: string }) {
+  const safe = useMemo(() => sanitizeCustomerDocHtml(html || ''), [html]);
+  const isEmpty = !html?.replace(/<[^>]+>/g, '').trim();
+  if (isEmpty) {
+    return <p className="text-text-muted italic text-sm px-3 py-2 min-h-[240px]">No content yet.</p>;
+  }
+  return (
+    <div
+      className="doc-html-preview"
+      // sanitized in useMemo
+      dangerouslySetInnerHTML={{ __html: safe }}
+    />
+  );
 }
 
 export function DocumentationTab({ customerId, canEdit }: { customerId: string; canEdit: boolean }) {
@@ -50,8 +68,8 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     });
   }, [sections]);
 
-  // Sync draft when switching section (ref avoids resetting draft when `sections` refetches)
-  useEffect(() => {
+  // Sync draft when switching section (layout effect avoids flash of wrong body in editor)
+  useLayoutEffect(() => {
     if (!selectedId) {
       setDraftTitle('');
       setDraftBody('');
@@ -273,23 +291,19 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
               {dirty && canEdit ? ' · Unsaved changes' : null}
             </p>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-3">
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col">
               {showEditor ? (
-                <textarea
-                  value={draftBody}
-                  onChange={e => { setDraftBody(e.target.value); setDirty(true); }}
-                  className="w-full min-h-[240px] h-full max-h-[480px] text-sm font-mono text-text-primary bg-surface border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y"
-                  placeholder="Technical notes, procedures, IPs, credentials pointers (store secrets in a vault)…"
-                  spellCheck
+                <DocRichTextEditor
+                  key={selectedId}
+                  value={normalizeBodyForEditor(draftBody)}
+                  onChange={html => { setDraftBody(html); setDirty(true); }}
+                  customerId={customerId}
+                  sectionId={selected.id}
+                  editable
+                  placeholder="Technical notes, procedures, diagrams (images upload to secure storage)…"
                 />
               ) : (
-                <div
-                  className="text-sm text-text-secondary whitespace-pre-wrap font-mono bg-surface border border-border rounded-lg px-3 py-2 min-h-[240px]"
-                >
-                  {draftBody.trim() ? draftBody : (
-                    <span className="text-text-muted italic">No content yet.</span>
-                  )}
-                </div>
+                <DocHtmlPreview html={draftBody} />
               )}
             </div>
           </>

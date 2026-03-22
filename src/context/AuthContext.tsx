@@ -29,14 +29,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const currentUserIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
 
-  const loadProfile = useCallback(async (uid: string) => {
+  const loadProfile = useCallback(async (uid: string, authEmail?: string | null) => {
     const { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', uid)
       .maybeSingle();  // maybeSingle: returns null (no error) when 0 rows
 
-    setProfile(data ? (data as Profile) : null);
+    const row = data ? (data as Profile) : null;
+    if (!row) {
+      setProfile(null);
+      return;
+    }
+
+    // Keep public.profiles.email aligned with auth.users.email after email change
+    // confirmations, so the rest of the app reads a consistent value.
+    if (authEmail && row.email !== authEmail) {
+      const { data: synced } = await supabase
+        .from('profiles')
+        .update({ email: authEmail })
+        .eq('id', uid)
+        .select('*')
+        .maybeSingle();
+      setProfile((synced as Profile | null) ?? { ...row, email: authEmail });
+      return;
+    }
+
+    setProfile(row);
   }, []);
 
   useEffect(() => {
@@ -62,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         !initializedRef.current || event === 'INITIAL_SESSION' || previousUserId !== nextUserId;
       if (shouldBlockUi) setLoading(true);
 
-      void loadProfile(u.id)
+      void loadProfile(u.id, u.email ?? null)
         .finally(() => {
           initializedRef.current = true;
           if (shouldBlockUi) setLoading(false);

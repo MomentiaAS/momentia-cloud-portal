@@ -300,7 +300,7 @@ const TZ_KEY = 'momentia-timezone';
 export function SettingsPage() {
   const { theme, toggleTheme }                   = useTheme();
   const { weatherLocation, setWeatherLocation }  = useApp();
-  const { profile }                              = useAuth();
+  const { user, profile }                        = useAuth();
 
   const [locationSaved, setLocationSaved] = useState(false);
   const [pendingLoc, setPendingLoc]       = useState<WeatherLocation | null>(null);
@@ -314,6 +314,23 @@ export function SettingsPage() {
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileBusy,  setProfileBusy]  = useState(false);
+  const [emailDraft,   setEmailDraft]   = useState(profile?.email ?? '');
+  const [emailBusy,    setEmailBusy]    = useState(false);
+  const [emailSaved,   setEmailSaved]   = useState(false);
+  const [emailError,   setEmailError]   = useState<string | null>(null);
+  const [emailInfo,    setEmailInfo]    = useState<string | null>(null);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword,     setNewPassword]     = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordBusy,    setPasswordBusy]    = useState(false);
+  const [passwordSaved,   setPasswordSaved]   = useState(false);
+  const [passwordError,   setPasswordError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    setNameDraft(profile?.name ?? '');
+    setEmailDraft(profile?.email ?? user?.email ?? '');
+  }, [profile?.id, profile?.name, profile?.email, user?.email]);
 
   function handleLocationSelect(loc: WeatherLocation) {
     setPendingLoc(loc);
@@ -356,6 +373,76 @@ export function SettingsPage() {
     setProfileBusy(false);
   }
 
+  async function saveEmail() {
+    if (!user) return;
+    const nextEmail = emailDraft.trim().toLowerCase();
+    const currentEmail = (user.email ?? profile?.email ?? '').toLowerCase();
+    if (!nextEmail || nextEmail === currentEmail) return;
+    if (!/\S+@\S+\.\S+/.test(nextEmail)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+
+    setEmailBusy(true);
+    setEmailError(null);
+    setEmailInfo(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: nextEmail });
+      if (error) throw error;
+      setEmailSaved(true);
+      setEmailInfo('Email update requested. Check your inbox for a confirmation link.');
+      setTimeout(() => setEmailSaved(false), 2500);
+    } catch (e) {
+      setEmailError(e instanceof Error ? e.message : 'Failed to update email.');
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function savePassword() {
+    if (!user) return;
+    const loginEmail = user.email ?? profile?.email ?? '';
+    if (!loginEmail) {
+      setPasswordError('Current email is unavailable for verification.');
+      return;
+    }
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Please fill in all password fields.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match.');
+      return;
+    }
+
+    setPasswordBusy(true);
+    setPasswordError(null);
+    try {
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: currentPassword,
+      });
+      if (verifyErr) throw new Error('Current password is incorrect.');
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      setPasswordSaved(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPasswordSaved(false), 2500);
+    } catch (e) {
+      setPasswordError(e instanceof Error ? e.message : 'Failed to update password.');
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
   const displayName = profile?.name ?? profile?.email ?? 'User';
   const roleLabel   = profile?.role
     ? { superadmin: 'Super Admin', admin: 'Admin', technician: 'Technician', viewer: 'Viewer' }[profile.role] ?? profile.role
@@ -385,7 +472,7 @@ export function SettingsPage() {
               value={nameDraft}
               onChange={e => { setNameDraft(e.target.value); setProfileSaved(false); }}
             />
-            <Input label="Email" type="email" value={profile?.email ?? ''} disabled />
+            <Input label="Email" type="email" value={user?.email ?? profile?.email ?? ''} disabled />
             <Input label="Role" value={roleLabel} disabled />
           </div>
           {profileError && <p className="mt-2 text-xs text-red-500">{profileError}</p>}
@@ -396,6 +483,73 @@ export function SettingsPage() {
               {profileBusy ? 'Saving…' : 'Save Profile'}
             </Button>
           </div>
+        </CardBody>
+      </Card>
+
+      {/* Security */}
+      <Card>
+        <CardHeader title="Security" subtitle="Change login email and password" />
+        <CardBody className="space-y-6">
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Email</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Login Email"
+                type="email"
+                value={emailDraft}
+                onChange={e => { setEmailDraft(e.target.value); setEmailSaved(false); setEmailError(null); }}
+              />
+            </div>
+            {emailError && <p className="text-xs text-red-500">{emailError}</p>}
+            {emailInfo && <p className="text-xs text-text-muted">{emailInfo}</p>}
+            <div className="flex items-center gap-2 justify-end">
+              {emailSaved && <span className="text-xs text-emerald-500">Saved!</span>}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={saveEmail}
+                disabled={emailBusy || !emailDraft.trim() || emailDraft.trim().toLowerCase() === (user?.email ?? profile?.email ?? '').toLowerCase()}
+              >
+                {emailBusy ? 'Saving…' : 'Update Email'}
+              </Button>
+            </div>
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">Password</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Current Password"
+                type="password"
+                value={currentPassword}
+                onChange={e => { setCurrentPassword(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
+              />
+              <Input
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={e => { setNewPassword(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
+              />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                value={confirmPassword}
+                onChange={e => { setConfirmPassword(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
+              />
+            </div>
+            {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+            <div className="flex items-center gap-2 justify-end">
+              {passwordSaved && <span className="text-xs text-emerald-500">Saved!</span>}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={savePassword}
+                disabled={passwordBusy || !currentPassword || !newPassword || !confirmPassword}
+              >
+                {passwordBusy ? 'Saving…' : 'Update Password'}
+              </Button>
+            </div>
+          </section>
         </CardBody>
       </Card>
 

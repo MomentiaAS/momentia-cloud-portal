@@ -219,7 +219,11 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               value={form.name}
               onChange={e => set('name', e.target.value)}
               error={errors.name}
-              className="sm:col-span-2"
+            />
+            <Input
+              label="Org.nr"
+              value={form.orgNumber}
+              onChange={e => set('orgNumber', e.target.value)}
             />
             <Select label="Status" value={form.status} onChange={e => set('status', e.target.value as CustomerStatus)}>
               <option value="active">Active</option>
@@ -235,11 +239,6 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               label="Domain"
               value={form.domain}
               onChange={e => set('domain', e.target.value)}
-            />
-            <Input
-              label="Org.nr"
-              value={form.orgNumber}
-              onChange={e => set('orgNumber', e.target.value)}
             />
             <Input
               label="Address"

@@ -70,6 +70,16 @@ export function useProfiles() {
     if (!data) {
       throw new Error('Name was not saved. You may lack permission to edit this user.');
     }
+    // Confirm persistence from DB to avoid false-positive "saved" states.
+    const { data: verify, error: verifyErr } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', id)
+      .single();
+    if (verifyErr) throw new Error(`Saved, but verification failed: ${verifyErr.message}`);
+    if ((verify?.name ?? null) !== trimmed) {
+      throw new Error('Name update did not persist. Check your profiles UPDATE RLS policies in Supabase.');
+    }
     setProfiles(prev =>
       prev.map(p => (p.id === id ? { ...p, name: data.name as string | null } : p)),
     );

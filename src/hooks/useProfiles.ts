@@ -59,12 +59,12 @@ export function useProfiles() {
   }
 
   async function updateName(id: string, name: string): Promise<void> {
-    const trimmed = name.trim() || null;
+    const trimmed = name.trim();
     const { data, error: err } = await supabase
-      .from('profiles')
-      .update({ name: trimmed })
-      .eq('id', id)
-      .select()
+      .rpc('update_profile_name', {
+        target_profile_id: id,
+        new_name: trimmed,
+      })
       .single();
     if (err) throw new Error(err.message);
     if (!data) {
@@ -77,11 +77,12 @@ export function useProfiles() {
       .eq('id', id)
       .single();
     if (verifyErr) throw new Error(`Saved, but verification failed: ${verifyErr.message}`);
-    if ((verify?.name ?? null) !== trimmed) {
+    const savedName = (verify?.name ?? null) as string | null;
+    if (savedName !== (trimmed || null)) {
       throw new Error('Name update did not persist. Check your profiles UPDATE RLS policies in Supabase.');
     }
     setProfiles(prev =>
-      prev.map(p => (p.id === id ? { ...p, name: data.name as string | null } : p)),
+      prev.map(p => (p.id === id ? { ...p, name: savedName } : p)),
     );
   }
 

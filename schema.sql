@@ -117,6 +117,58 @@ returns text as $$
   select role from public.profiles where id = auth.uid();
 $$ language sql security definer stable;
 
+-- Deterministic profile-name updater to avoid client-side RLS ambiguity.
+-- - superadmin: may update any profile
+-- - admin: may update non-superadmin profiles
+-- - any user: may update own profile
+create or replace function public.update_profile_name(
+  target_profile_id uuid,
+  new_name text
+)
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor_id   uuid := auth.uid();
+  actor_role text := public.current_user_role();
+  updated    public.profiles;
+begin
+  if actor_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if actor_role = 'superadmin' then
+    update public.profiles
+    set name = nullif(btrim(new_name), '')
+    where id = target_profile_id
+    returning * into updated;
+  elsif actor_role = 'admin' then
+    update public.profiles
+    set name = nullif(btrim(new_name), '')
+    where id = target_profile_id
+      and role <> 'superadmin'
+    returning * into updated;
+  elsif actor_id = target_profile_id then
+    update public.profiles
+    set name = nullif(btrim(new_name), '')
+    where id = target_profile_id
+    returning * into updated;
+  else
+    raise exception 'Insufficient permissions to update this profile';
+  end if;
+
+  if updated.id is null then
+    raise exception 'Profile was not updated';
+  end if;
+
+  return updated;
+end;
+$$;
+
+grant execute on function public.update_profile_name(uuid, text) to authenticated;
+
 -- Data tables: require authentication (replaces the old "Allow all")
 do $$ begin
   if not exists (select 1 from pg_policies where tablename = 'customers'   and policyname = 'Authenticated users') then

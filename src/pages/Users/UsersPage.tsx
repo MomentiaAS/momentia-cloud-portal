@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   UserPlus, RefreshCw, Shield, Eye, Wrench, AlertCircle, X,
-  ChevronDown, ChevronUp, Trash2, Check, Pencil,
+  ChevronDown, ChevronUp, Trash2, Check,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -201,6 +201,7 @@ function UserRow({
   const [nameSaved,      setNameSaved]      = useState(false);
   const [roleSaving,     setRoleSaving]     = useState(false);
   const [assignedIds,    setAssignedIds]    = useState<string[]>([]);
+  const [loadedAssignedIds, setLoadedAssignedIds] = useState<string[]>([]);
   const [assignLoading,  setAssignLoading]  = useState(false);
   const [assignSaving,   setAssignSaving]   = useState(false);
   const [assignSaved,    setAssignSaved]    = useState(false);
@@ -214,6 +215,7 @@ function UserRow({
     try {
       const ids = await onFetchAssignments(profile.id);
       setAssignedIds(ids);
+      setLoadedAssignedIds(ids);
     } catch { /* ignore */ }
     setAssignLoading(false);
   }, [onFetchAssignments, profile.id, needsCustomerScope]);
@@ -261,12 +263,31 @@ function UserRow({
     setAssignError(null);
     try {
       await onSaveAssignments(profile.id, assignedIds);
+      setLoadedAssignedIds(assignedIds);
       setAssignSaved(true);
       setTimeout(() => setAssignSaved(false), 2000);
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : 'Failed to save assignments.');
     } finally {
       setAssignSaving(false);
+    }
+  }
+
+  const nameDraftTrimmed = nameDraft.trim();
+  const currentNameTrimmed = (profile.name ?? '').trim();
+  const canSaveName = canEditUserNames && !!nameDraftTrimmed && nameDraftTrimmed !== currentNameTrimmed;
+  const canSaveAssignments = isSuperAdmin
+    && needsCustomerScope
+    && [...assignedIds].sort().join(',') !== [...loadedAssignedIds].sort().join(',');
+  const hasPendingChanges = canSaveName || canSaveAssignments;
+
+  async function handleCardSave() {
+    if (!hasPendingChanges) return;
+    if (canSaveName) {
+      await handleNameSave();
+    }
+    if (canSaveAssignments) {
+      await saveAssignments();
     }
   }
 
@@ -307,23 +328,12 @@ function UserRow({
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Full Name</label>
               {canEditUserNames ? (
-                <div className="flex gap-2">
-                  <input
-                    className={inputClass}
-                    value={nameDraft}
-                    onChange={e => { setNameDraft(e.target.value); setNameSaved(false); }}
-                    onKeyDown={e => e.key === 'Enter' && handleNameSave()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleNameSave()}
-                    disabled={nameSaving || !nameDraft.trim()}
-                    className="h-9 px-2.5 rounded-lg border border-border bg-surface text-text-secondary hover:text-accent hover:border-accent disabled:opacity-50 transition-colors"
-                    title="Save name"
-                  >
-                    {nameSaved ? <Check className="size-3.5 text-emerald-500" /> : <Pencil className="size-3.5" />}
-                  </button>
-                </div>
+                <input
+                  className={inputClass}
+                  value={nameDraft}
+                  onChange={e => { setNameDraft(e.target.value); setNameSaved(false); }}
+                  onKeyDown={e => e.key === 'Enter' && void handleCardSave()}
+                />
               ) : (
                 <p className="h-9 flex items-center px-3 text-sm text-text-primary">{profile.name ?? '—'}</p>
               )}
@@ -363,20 +373,6 @@ function UserRow({
                 <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                   Assigned Customers
                 </p>
-                {isSuperAdmin && (
-                  <div className="flex items-center gap-2">
-                    {assignSaved && <span className="text-xs text-emerald-500">Saved!</span>}
-                    {assignError && <span className="text-xs text-red-500">{assignError}</span>}
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={saveAssignments}
-                      disabled={assignSaving}
-                    >
-                      {assignSaving ? 'Saving…' : 'Save'}
-                    </Button>
-                  </div>
-                )}
               </div>
 
               {assignLoading ? (
@@ -421,9 +417,28 @@ function UserRow({
             </p>
           )}
 
-          {/* Delete — superadmin only, not self */}
-          {isSuperAdmin && !isSelf && (
-            <div className="flex justify-end pt-1">
+          {/* Save/Delete actions */}
+          <div className="flex items-center justify-between pt-1">
+            {(canEditUserNames || (isSuperAdmin && needsCustomerScope)) ? (
+              <div className="flex items-center gap-2">
+                {(nameSaved || assignSaved) && (
+                  <span className="text-xs text-emerald-500">Saved!</span>
+                )}
+                {assignError && <span className="text-xs text-red-500">{assignError}</span>}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void handleCardSave()}
+                  disabled={nameSaving || assignSaving || !hasPendingChanges}
+                >
+                  {(nameSaving || assignSaving) ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            ) : (
+              <div />
+            )}
+
+            {isSuperAdmin && !isSelf && (
               <button
                 onClick={() => onDelete(profile.id, profile.name ?? profile.email)}
                 className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 transition-colors"
@@ -431,8 +446,8 @@ function UserRow({
                 <Trash2 className="size-3.5" />
                 Remove user
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

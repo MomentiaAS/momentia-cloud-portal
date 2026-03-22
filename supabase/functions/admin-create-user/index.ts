@@ -28,14 +28,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Use custom secret names to avoid reserved SUPABASE_* restrictions in CLI.
-    const supabaseUrl = Deno.env.get('PROJECT_URL');
-    const anonKey = Deno.env.get('PROJECT_ANON_KEY');
-    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY');
+    // Support both custom and legacy secret names.
+    const supabaseUrl = Deno.env.get('PROJECT_URL') ?? Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('PROJECT_ANON_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY');
+    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const authHeader = req.headers.get('Authorization');
 
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      return json(500, { error: 'Missing function secrets: PROJECT_URL, PROJECT_ANON_KEY, SERVICE_ROLE_KEY.' });
+      return json(500, {
+        error: 'Missing function secrets. Set PROJECT_URL/PROJECT_ANON_KEY/SERVICE_ROLE_KEY (or SUPABASE_URL/SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY).',
+      });
     }
     if (!authHeader) {
       return json(401, { error: 'Missing Authorization header.' });

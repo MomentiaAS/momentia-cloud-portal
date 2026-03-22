@@ -127,8 +127,7 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
             </div>
             <p className="font-semibold text-text-primary">User created!</p>
             <p className="text-sm text-text-muted">
-              A confirmation email has been sent to <strong>{email}</strong>.
-              They must confirm before logging in.
+              <strong>{email}</strong> can sign in immediately with the temporary password.
             </p>
             <Button variant="primary" size="sm" onClick={onClose} className="mt-2">Done</Button>
           </div>
@@ -177,7 +176,7 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
               )}
             </div>
             <p className="text-xs text-text-muted">
-              The user receives a confirmation email and must verify before signing in.
+              User is created as an active account (no email verification step).
               {needsCustomerScope && ' Technician/viewer users need at least one customer assignment.'}
             </p>
             <div className="flex justify-end gap-2 pt-1">

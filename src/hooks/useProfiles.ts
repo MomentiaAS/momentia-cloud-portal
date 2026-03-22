@@ -1,22 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import type { Profile, UserRole } from '../context/AuthContext';
-
-/** A temporary Supabase client with no session persistence — used for
- *  creating new users without overwriting the admin's current session. */
-function makeEphemeralClient() {
-  const noopStorage = {
-    getItem:    () => null,
-    setItem:    () => undefined,
-    removeItem: () => undefined,
-  };
-  return createClient(
-    import.meta.env.VITE_SUPABASE_URL as string,
-    import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    { auth: { storage: noopStorage, persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
-  );
-}
 
 export interface CreateUserPayload {
   name:              string;
@@ -88,43 +72,19 @@ export function useProfiles() {
   }
 
   async function createUser(payload: CreateUserPayload): Promise<void> {
-    const client = makeEphemeralClient();
-    const { data, error: signUpErr } = await client.auth.signUp({
-      email:    payload.email,
-      password: payload.password,
-      options: {
-        data: { name: payload.name },
-        emailRedirectTo: window.location.origin,
+    const { error: fnErr } = await supabase.functions.invoke('admin-create-user', {
+      body: {
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role,
+        initialCustomerId: payload.initialCustomerId ?? null,
       },
     });
-    if (signUpErr) throw new Error(signUpErr.message);
-
-    // data.user is null when signups are disabled or the email is already registered
-    if (!data.user) {
+    if (fnErr) {
       throw new Error(
-        'Account creation failed. Check that "Enable sign ups" is on in your Supabase Auth settings, ' +
-        'or that this email is not already registered.',
+        fnErr.message || 'Could not create user. Ensure admin-create-user edge function is deployed.',
       );
-    }
-
-    // Upsert (not update) so the profile row is created immediately even if
-    // the handle_new_user trigger hasn't committed yet.
-    const { error: upsertErr } = await supabase
-      .from('profiles')
-      .upsert(
-        { id: data.user.id, email: payload.email, name: payload.name, role: payload.role },
-        { onConflict: 'id' },
-      );
-    if (upsertErr) throw new Error(upsertErr.message);
-
-    const requiresCustomerScope = payload.role === 'technician' || payload.role === 'viewer';
-    if (requiresCustomerScope && payload.initialCustomerId) {
-      const { error: assignErr } = await supabase
-        .from('user_customers')
-        .insert({ user_id: data.user.id, customer_id: payload.initialCustomerId });
-      if (assignErr) {
-        throw new Error(`User created, but initial customer assignment failed: ${assignErr.message}`);
-      }
     }
 
     await fetchProfiles();

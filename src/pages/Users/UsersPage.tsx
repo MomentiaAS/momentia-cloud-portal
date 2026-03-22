@@ -42,28 +42,38 @@ const inputClass = cn(
 
 // ── Create User Modal ────────────────────────────────────────────────────────
 
-function CreateUserModal({ onClose, onCreate }: {
-  onClose:  () => void;
-  onCreate: (p: CreateUserPayload) => Promise<void>;
+function CreateUserModal({ onClose, onCreate, allCustomers }: {
+  onClose:       () => void;
+  onCreate:      (p: CreateUserPayload) => Promise<void>;
+  allCustomers:  { id: string; name: string }[];
 }) {
   const ADD_USER_DRAFT_KEY = 'momentia:draft:add-user';
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [role,     setRole]     = useState<UserRole>('technician');
+  const [initialCustomerId, setInitialCustomerId] = useState('');
   const [busy,     setBusy]     = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [success,  setSuccess]  = useState(false);
+  const needsCustomerScope = role === 'technician' || role === 'viewer';
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(ADD_USER_DRAFT_KEY);
       if (!raw) return;
-      const draft = JSON.parse(raw) as Partial<{ name: string; email: string; password: string; role: UserRole }>;
+      const draft = JSON.parse(raw) as Partial<{
+        name: string;
+        email: string;
+        password: string;
+        role: UserRole;
+        initialCustomerId: string;
+      }>;
       if (draft.name) setName(draft.name);
       if (draft.email) setEmail(draft.email);
       if (draft.password) setPassword(draft.password);
       if (draft.role) setRole(draft.role);
+      if (draft.initialCustomerId) setInitialCustomerId(draft.initialCustomerId);
     } catch {
       // ignore malformed draft
     }
@@ -73,17 +83,24 @@ function CreateUserModal({ onClose, onCreate }: {
     if (success) return;
     sessionStorage.setItem(
       ADD_USER_DRAFT_KEY,
-      JSON.stringify({ name, email, password, role }),
+      JSON.stringify({ name, email, password, role, initialCustomerId }),
     );
-  }, [name, email, password, role, success]);
+  }, [name, email, password, role, initialCustomerId, success]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !password) return;
+    if (needsCustomerScope && !initialCustomerId) return;
     setBusy(true);
     setError(null);
     try {
-      await onCreate({ name: name.trim(), email: email.trim(), password, role });
+      await onCreate({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+        initialCustomerId: needsCustomerScope ? initialCustomerId : undefined,
+      });
       sessionStorage.removeItem(ADD_USER_DRAFT_KEY);
       setSuccess(true);
     } catch (err) {
@@ -142,13 +159,35 @@ function CreateUserModal({ onClose, onCreate }: {
                   {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
+              {needsCustomerScope && (
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+                    Initial Customer Access
+                  </label>
+                  <select
+                    className={cn(inputClass, 'bg-surface')}
+                    value={initialCustomerId}
+                    onChange={e => setInitialCustomerId(e.target.value)}
+                    required
+                  >
+                    <option value="">Select a customer…</option>
+                    {allCustomers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <p className="text-xs text-text-muted">
               The user receives a confirmation email and must verify before signing in.
+              {needsCustomerScope && ' Technician/viewer users need at least one customer assignment.'}
             </p>
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-              <Button type="submit" variant="primary" size="sm" disabled={busy || !name || !email || !password}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={busy || !name || !email || !password || (needsCustomerScope && !initialCustomerId)}
+              >
                 {busy ? 'Creating…' : 'Create User'}
               </Button>
             </div>
@@ -630,6 +669,7 @@ export function UsersPage() {
         <CreateUserModal
           onClose={() => setShowCreate(false)}
           onCreate={createUser}
+          allCustomers={allCustomers}
         />
       )}
 

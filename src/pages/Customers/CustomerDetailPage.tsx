@@ -699,7 +699,7 @@ export function CustomerDetailPage() {
               <Badge variant={c.status === 'active' ? 'success' : c.status === 'archived' ? 'default' : 'info'} className="capitalize">{c.status}</Badge>
             </div>
             <p className="text-sm text-text-muted mt-0.5">
-              {[c.domain, c.address, c.state].filter(Boolean).join(' · ')}
+              {[c.domain, c.orgNumber ? `Org.nr ${c.orgNumber}` : null, c.address, c.state].filter(Boolean).join(' · ')}
               {c.tier && <span className="ml-2 capitalize text-text-secondary">· {c.tier}</span>}
             </p>
           </div>

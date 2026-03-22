@@ -23,6 +23,7 @@ create table if not exists public.customers (
   primary_contact jsonb not null default '{}',
   billing_contact jsonb,
   domain          text,
+  org_nr          text,
   address         text,
   state           text,
   notes           text,
@@ -202,6 +203,9 @@ end $$;
 
 -- v4 → v5: UniFi integration
 alter table public.customers add column if not exists unifi_site_id text;
+
+-- v5 → v6: add organisation number
+alter table public.customers add column if not exists org_nr text;
 
 -- v1 → v2: customers schema changes
 alter table public.customers add column if not exists state text;

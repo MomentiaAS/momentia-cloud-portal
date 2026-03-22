@@ -19,10 +19,11 @@ function makeEphemeralClient() {
 }
 
 export interface CreateUserPayload {
-  name:     string;
-  email:    string;
-  password: string;
-  role:     UserRole;
+  name:              string;
+  email:             string;
+  password:          string;
+  role:              UserRole;
+  initialCustomerId?: string;
 }
 
 export function useProfiles() {
@@ -115,6 +116,16 @@ export function useProfiles() {
         { onConflict: 'id' },
       );
     if (upsertErr) throw new Error(upsertErr.message);
+
+    const requiresCustomerScope = payload.role === 'technician' || payload.role === 'viewer';
+    if (requiresCustomerScope && payload.initialCustomerId) {
+      const { error: assignErr } = await supabase
+        .from('user_customers')
+        .insert({ user_id: data.user.id, customer_id: payload.initialCustomerId });
+      if (assignErr) {
+        throw new Error(`User created, but initial customer assignment failed: ${assignErr.message}`);
+      }
+    }
 
     await fetchProfiles();
   }

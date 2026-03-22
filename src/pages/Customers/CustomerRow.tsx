@@ -50,7 +50,11 @@ export function CustomerRow({ customer: c, onEdit, onView, archived }: CustomerR
           className="text-left group"
         >
           <p className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">{c.name}</p>
-          {c.domain && <p className="text-xs text-text-muted">{c.domain}</p>}
+          {(c.domain || c.orgNumber) && (
+            <p className="text-xs text-text-muted">
+              {[c.domain, c.orgNumber ? `Org.nr ${c.orgNumber}` : null].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </button>
       </td>
 

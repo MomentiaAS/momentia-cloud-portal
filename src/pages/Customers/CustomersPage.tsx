@@ -28,6 +28,7 @@ export function CustomersPage() {
     return customers.filter(c =>
       c.name.toLowerCase().includes(q) ||
       (c.domain?.toLowerCase().includes(q)) ||
+      (c.orgNumber?.toLowerCase().includes(q)) ||
       c.primaryContact.name.toLowerCase().includes(q) ||
       c.assignedTech.toLowerCase().includes(q),
     );

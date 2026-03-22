@@ -24,6 +24,7 @@ export interface Customer {
   primaryContact: Contact;
   billingContact?: Contact;
   domain?:      string;
+  orgNumber?:   string;
   address?:     string;
   state?:       string;
   notes?:       string;

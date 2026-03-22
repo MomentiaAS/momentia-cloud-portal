@@ -7,6 +7,7 @@ export interface CustomerFormPayload {
   status:             string;
   tier:               string;
   domain:             string;
+  orgNumber:          string;
   address:            string;
   state:              string;
   assignedTech:       string;
@@ -35,6 +36,7 @@ function payloadToDb(data: CustomerFormPayload) {
     status:       data.status,
     tier:         data.tier,
     domain:       data.domain       || undefined,
+    orgNumber:    data.orgNumber    || undefined,
     address:      data.address      || undefined,
     state:        data.state        || undefined,
     assignedTech: data.assignedTech || undefined,

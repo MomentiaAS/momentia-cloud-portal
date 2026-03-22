@@ -15,6 +15,26 @@ const DEFAULT: CustomerFormPayload = {
   veeam: false, rmm: false, m365: false, azure: false, sentinelOne: false,
   unifi: false, unifiSiteId: '',
 };
+const ADD_CUSTOMER_DRAFT_KEY = 'momentia:draft:add-customer';
+
+function readAddCustomerDraft(): CustomerFormPayload | null {
+  try {
+    const raw = sessionStorage.getItem(ADD_CUSTOMER_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CustomerFormPayload>;
+    return { ...DEFAULT, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
+function writeAddCustomerDraft(form: CustomerFormPayload): void {
+  sessionStorage.setItem(ADD_CUSTOMER_DRAFT_KEY, JSON.stringify(form));
+}
+
+function clearAddCustomerDraft(): void {
+  sessionStorage.removeItem(ADD_CUSTOMER_DRAFT_KEY);
+}
 
 /** Fetches display names for the technician dropdown. */
 function useTechOptions() {
@@ -79,6 +99,50 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
   const [errors,  setErrors]  = useState<Partial<Record<keyof CustomerFormPayload, string>>>({});
   const [saving,  setSaving]  = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const isAddMode = !initial;
+
+  useEffect(() => {
+    if (!open) return;
+    if (isAddMode) {
+      setForm(readAddCustomerDraft() ?? { ...DEFAULT });
+      setErrors({});
+      setSaveErr(null);
+      return;
+    }
+    const sec = initial.billingContact;
+    setForm({
+      name:           initial.name,
+      status:         initial.status,
+      tier:           initial.tier,
+      domain:         initial.domain ?? '',
+      address:        initial.address ?? '',
+      state:          initial.state ?? '',
+      assignedTech:   initial.assignedTech,
+      contactName:    initial.primaryContact.name,
+      contactEmail:   initial.primaryContact.email,
+      contactPhone:   initial.primaryContact.phone ?? '',
+      contactRole:    initial.primaryContact.role ?? '',
+      secContactName:  sec?.name  ?? '',
+      secContactEmail: sec?.email ?? '',
+      secContactPhone: sec?.phone ?? '',
+      secContactRole:  sec?.role  ?? '',
+      notes:          initial.notes ?? '',
+      veeam:          initial.integrations.veeam,
+      rmm:            initial.integrations.rmm,
+      m365:           initial.integrations.m365,
+      azure:          initial.integrations.azure,
+      sentinelOne:    initial.integrations.sentinelOne,
+      unifi:          initial.integrations.unifi ?? false,
+      unifiSiteId:    initial.unifiSiteId ?? '',
+    });
+    setErrors({});
+    setSaveErr(null);
+  }, [open, initial, isAddMode]);
+
+  useEffect(() => {
+    if (!open || !isAddMode) return;
+    writeAddCustomerDraft(form);
+  }, [open, isAddMode, form]);
 
   function validate(): boolean {
     const e: typeof errors = {};
@@ -98,6 +162,7 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
     setSaveErr(null);
     try {
       await onSave(form);
+      if (isAddMode) clearAddCustomerDraft();
       onClose();
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : 'Save failed');

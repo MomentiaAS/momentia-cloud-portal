@@ -32,6 +32,26 @@ const BLANK: AssetPayload = {
   os: '', assignedTo: '', ipAddress: '', macAddress: '', location: '',
   status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
+const ADD_ASSET_DRAFT_KEY = 'momentia:draft:add-asset';
+
+function readAddAssetDraft(): AssetPayload | null {
+  try {
+    const raw = sessionStorage.getItem(ADD_ASSET_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AssetPayload>;
+    return { ...BLANK, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
+function writeAddAssetDraft(form: AssetPayload): void {
+  sessionStorage.setItem(ADD_ASSET_DRAFT_KEY, JSON.stringify(form));
+}
+
+function clearAddAssetDraft(): void {
+  sessionStorage.removeItem(ADD_ASSET_DRAFT_KEY);
+}
 
 function toPayload(a: Asset): AssetPayload {
   return {
@@ -63,13 +83,19 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
   const [form,  setForm]  = useState<AssetPayload>(BLANK);
   const [busy,  setBusy]  = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isAddMode = !initial;
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? toPayload(initial) : BLANK);
+      setForm(initial ? toPayload(initial) : (readAddAssetDraft() ?? BLANK));
       setError(null);
     }
   }, [open, initial]);
+
+  useEffect(() => {
+    if (!open || !isAddMode) return;
+    writeAddAssetDraft(form);
+  }, [open, isAddMode, form]);
 
   if (!open) return null;
 
@@ -84,6 +110,7 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
     setError(null);
     try {
       await onSave(form);
+      if (isAddMode) clearAddAssetDraft();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save asset.');

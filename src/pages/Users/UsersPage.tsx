@@ -46,6 +46,7 @@ function CreateUserModal({ onClose, onCreate }: {
   onClose:  () => void;
   onCreate: (p: CreateUserPayload) => Promise<void>;
 }) {
+  const ADD_USER_DRAFT_KEY = 'momentia:draft:add-user';
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -54,6 +55,28 @@ function CreateUserModal({ onClose, onCreate }: {
   const [error,    setError]    = useState<string | null>(null);
   const [success,  setSuccess]  = useState(false);
 
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(ADD_USER_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as Partial<{ name: string; email: string; password: string; role: UserRole }>;
+      if (draft.name) setName(draft.name);
+      if (draft.email) setEmail(draft.email);
+      if (draft.password) setPassword(draft.password);
+      if (draft.role) setRole(draft.role);
+    } catch {
+      // ignore malformed draft
+    }
+  }, []);
+
+  useEffect(() => {
+    if (success) return;
+    sessionStorage.setItem(
+      ADD_USER_DRAFT_KEY,
+      JSON.stringify({ name, email, password, role }),
+    );
+  }, [name, email, password, role, success]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !password) return;
@@ -61,6 +84,7 @@ function CreateUserModal({ onClose, onCreate }: {
     setError(null);
     try {
       await onCreate({ name: name.trim(), email: email.trim(), password, role });
+      sessionStorage.removeItem(ADD_USER_DRAFT_KEY);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user.');

@@ -45,21 +45,34 @@ export function useProfiles() {
   useEffect(() => { fetchProfiles(); }, [fetchProfiles]);
 
   async function updateRole(id: string, role: UserRole): Promise<void> {
-    const { error: err } = await supabase
+    const { data, error: err } = await supabase
       .from('profiles')
       .update({ role })
-      .eq('id', id);
+      .eq('id', id)
+      .select()
+      .single();
     if (err) throw new Error(err.message);
-    setProfiles(prev => prev.map(p => p.id === id ? { ...p, role } : p));
+    if (!data) {
+      throw new Error('Role was not updated. You may lack permission, or the user no longer exists.');
+    }
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, role: data.role as UserRole } : p));
   }
 
   async function updateName(id: string, name: string): Promise<void> {
-    const { error: err } = await supabase
+    const trimmed = name.trim() || null;
+    const { data, error: err } = await supabase
       .from('profiles')
-      .update({ name: name.trim() || null })
-      .eq('id', id);
+      .update({ name: trimmed })
+      .eq('id', id)
+      .select()
+      .single();
     if (err) throw new Error(err.message);
-    setProfiles(prev => prev.map(p => p.id === id ? { ...p, name: name.trim() || null } : p));
+    if (!data) {
+      throw new Error('Name was not saved. You may lack permission to edit this user.');
+    }
+    setProfiles(prev =>
+      prev.map(p => (p.id === id ? { ...p, name: data.name as string | null } : p)),
+    );
   }
 
   async function createUser(payload: CreateUserPayload): Promise<void> {

@@ -180,6 +180,8 @@ interface UserRowProps {
   profile:              import('../../context/AuthContext').Profile;
   isSelf:               boolean;
   isSuperAdmin:         boolean;
+  /** Superadmin or admin — may edit display names (RLS must allow). */
+  canEditUserNames:     boolean;
   allCustomers:         { id: string; name: string }[];
   onRoleChange:         (id: string, role: UserRole) => Promise<void>;
   onNameSave:           (id: string, name: string) => Promise<void>;
@@ -189,7 +191,7 @@ interface UserRowProps {
 }
 
 function UserRow({
-  profile, isSelf, isSuperAdmin, allCustomers, onRoleChange, onNameSave, onDelete,
+  profile, isSelf, isSuperAdmin, canEditUserNames, allCustomers, onRoleChange, onNameSave, onDelete,
   onFetchAssignments, onSaveAssignments,
 }: UserRowProps) {
 
@@ -220,6 +222,10 @@ function UserRow({
     if (expanded) loadAssignments();
   }, [expanded, loadAssignments]);
 
+  useEffect(() => {
+    setNameDraft(profile.name ?? '');
+  }, [profile.id, profile.name]);
+
   async function handleRoleChange(newRole: UserRole) {
     setRoleSaving(true);
     try {
@@ -236,6 +242,8 @@ function UserRow({
       await onNameSave(profile.id, nameDraft);
       setNameSaved(true);
       setTimeout(() => setNameSaved(false), 2000);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Could not save name.');
     } finally {
       setNameSaving(false);
     }
@@ -298,7 +306,7 @@ function UserRow({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Full Name</label>
-              {isSuperAdmin ? (
+              {canEditUserNames ? (
                 <div className="flex gap-2">
                   <input
                     className={inputClass}
@@ -307,7 +315,8 @@ function UserRow({
                     onKeyDown={e => e.key === 'Enter' && handleNameSave()}
                   />
                   <button
-                    onClick={handleNameSave}
+                    type="button"
+                    onClick={() => void handleNameSave()}
                     disabled={nameSaving || !nameDraft.trim()}
                     className="h-9 px-2.5 rounded-lg border border-border bg-surface text-text-secondary hover:text-accent hover:border-accent disabled:opacity-50 transition-colors"
                     title="Save name"
@@ -446,6 +455,7 @@ export function UsersPage() {
   const [pageError,    setPageError]    = useState<string | null>(null);
 
   const isSuperAdmin = currentProfile?.role === 'superadmin';
+  const canEditUserNames = isSuperAdmin || currentProfile?.role === 'admin';
 
   const allCustomers = customers.map(c => ({ id: c.id, name: c.name }));
 
@@ -456,7 +466,14 @@ export function UsersPage() {
   }
 
   async function handleNameSave(id: string, name: string) {
-    await updateName(id, name);
+    setPageError(null);
+    try {
+      await updateName(id, name);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update name.';
+      setPageError(msg);
+      throw err;
+    }
   }
 
   async function handleDeleteConfirm() {
@@ -552,6 +569,7 @@ export function UsersPage() {
                   profile={p}
                   isSelf={p.id === currentProfile?.id}
                   isSuperAdmin={isSuperAdmin}
+                  canEditUserNames={canEditUserNames}
                   allCustomers={allCustomers}
                   onRoleChange={handleRoleChange}
                   onNameSave={handleNameSave}

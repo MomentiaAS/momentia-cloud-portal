@@ -203,6 +203,22 @@ do $$ begin
     );
 end $$;
 
+-- Admins can update non–super-admin profiles (e.g. display names). Superadmin
+-- already has "Superadmin manage"; own row still covered by "Own profile update".
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename = 'profiles' and policyname = 'Admin update profiles') then
+    create policy "Admin update profiles" on public.profiles
+      for update using (
+        public.current_user_role() = 'admin'
+        and role <> 'superadmin'
+      )
+      with check (
+        public.current_user_role() = 'admin'
+        and role <> 'superadmin'
+      );
+  end if;
+end $$;
+
 -- Replace broad "Authenticated users" policies with role-scoped ones
 -- Drop old policies first
 do $$ begin

@@ -19,6 +19,8 @@ export function CustomersPage() {
 
   const { profile } = useAuth();
   const isRestricted = profile?.role === 'viewer' || profile?.role === 'technician';
+  const isCustomerRole = profile?.role === 'viewer';
+  const entityLabelPlural = isCustomerRole ? 'Sites' : 'Customers';
 
   const { customers, loading, error, reload, addCustomer, editCustomer } = useCustomers();
 
@@ -49,10 +51,10 @@ export function CustomersPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Customers</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{entityLabelPlural}</h1>
           <p className="text-sm text-text-secondary mt-0.5">
             {isRestricted
-              ? `${customers.length} customer${customers.length !== 1 ? 's' : ''}`
+              ? `${customers.length} ${isCustomerRole ? 'site' : 'customer'}${customers.length !== 1 ? 's' : ''}`
               : `${customers.filter(c => c.status === 'active').length} active · ${customers.filter(c => c.status === 'potential').length} potential`
             }
           </p>
@@ -73,10 +75,10 @@ export function CustomersPage() {
       <div className="max-w-sm">
         <Input
           leftIcon={<Search className="size-3.5" />}
-          placeholder="Filter customers…"
+          placeholder={`Filter ${entityLabelPlural.toLowerCase()}…`}
           value={query}
           onChange={e => setQuery(e.target.value)}
-          aria-label="Filter customers"
+          aria-label={`Filter ${entityLabelPlural.toLowerCase()}`}
         />
       </div>
 

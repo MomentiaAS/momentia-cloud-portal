@@ -124,7 +124,16 @@ export function CriticalAlertsCard({ className }: { className?: string }) {
             {topAlerts.warranty.map(w => (
               <li
                 key={w.id}
-                className="flex items-start gap-3 p-2.5 rounded-lg bg-surface hover:bg-primary-50 dark:hover:bg-primary-800/40 transition-colors"
+                className="flex items-start gap-3 p-2.5 rounded-lg bg-surface hover:bg-primary-50 dark:hover:bg-primary-800/40 transition-colors cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/customers/${w.customerId}?tab=assets`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/customers/${w.customerId}?tab=assets`);
+                  }
+                }}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -141,7 +150,10 @@ export function CriticalAlertsCard({ className }: { className?: string }) {
                   variant="ghost"
                   size="icon"
                   aria-label="View asset"
-                  onClick={() => navigate(`/customers/${w.customerId}?tab=assets`)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/customers/${w.customerId}?tab=assets`);
+                  }}
                 >
                   <Eye className="size-3.5" />
                 </Button>

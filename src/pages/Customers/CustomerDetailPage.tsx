@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, RefreshCw, AlertCircle,
   CheckCircle2, AlertTriangle, XCircle, Clock,
@@ -320,7 +320,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 
 // ── Tab: Alerts ───────────────────────────────────────────────────────────────
 
-function AlertsTab({ alerts }: { alerts: Alert[] }) {
+function AlertsTab({ alerts, highlightedAlertId }: { alerts: Alert[]; highlightedAlertId?: string | null }) {
   const open = alerts.filter(a => !a.resolved);
   const resolved = alerts.filter(a => a.resolved);
 
@@ -331,7 +331,14 @@ function AlertsTab({ alerts }: { alerts: Alert[] }) {
   return (
     <div className="divide-y divide-border">
       {[...open, ...resolved].map(alert => (
-        <div key={alert.id} className={cn('flex items-start gap-3 px-4 py-3', alert.resolved && 'opacity-50')}>
+        <div
+          key={alert.id}
+          className={cn(
+            'flex items-start gap-3 px-4 py-3',
+            alert.resolved && 'opacity-50',
+            highlightedAlertId === alert.id && 'bg-accent/10 ring-1 ring-accent/40',
+          )}
+        >
           <AlertCircle className={cn('size-4 mt-0.5 shrink-0', alert.resolved ? 'text-text-muted' : severityVariant[alert.severity] === 'danger' ? 'text-red-500' : 'text-amber-500')} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -682,6 +689,7 @@ type Tab = 'alerts' | 'logs' | 'backup' | 'network' | 'assets' | 'docs' | 'files
 export function CustomerDetailPage() {
   const { id }            = useParams<{ id: string }>();
   const navigate          = useNavigate();
+  const [searchParams]    = useSearchParams();
   const { profile }       = useAuth();
   const { detail, loading, error, reload } = useCustomerDetail(id);
   const { editCustomer }  = useCustomers();
@@ -690,8 +698,18 @@ export function CustomerDetailPage() {
   const [editOpen,       setEditOpen]       = useState(false);
   // Optimistic health from UniFi — overrides the DB value until next full reload
   const [healthOverride, setHealthOverride] = useState<HealthStatus | null>(null);
+  const tabParam = searchParams.get('tab');
+  const highlightedAlertId = searchParams.get('alert');
 
   const canEdit = profile?.role === 'superadmin' || profile?.role === 'admin' || profile?.role === 'technician';
+
+  useEffect(() => {
+    if (!tabParam) return;
+    const allowedTabs: Tab[] = ['alerts', 'logs', 'backup', 'assets', 'docs', 'files', 'network'];
+    if (!allowedTabs.includes(tabParam as Tab)) return;
+    if (tabParam === 'network' && !detail?.customer.integrations.unifi) return;
+    setActiveTab(tabParam as Tab);
+  }, [tabParam, detail?.customer.integrations.unifi]);
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
 
@@ -889,7 +907,7 @@ export function CustomerDetailPage() {
         </div>
 
         <CardBody className="p-0">
-          {activeTab === 'alerts'  && <AlertsTab  alerts={alerts} />}
+          {activeTab === 'alerts'  && <AlertsTab  alerts={alerts} highlightedAlertId={highlightedAlertId} />}
           {activeTab === 'logs'    && <LogsTab     logs={logs} />}
           {activeTab === 'backup'  && <BackupTab   jobs={backupJobs} />}
           {activeTab === 'assets'  && <AssetsTab   customerId={c.id} canEdit={canEdit} />}

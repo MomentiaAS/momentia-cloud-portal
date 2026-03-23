@@ -72,32 +72,33 @@ export function useProfiles() {
   }
 
   async function createUser(payload: CreateUserPayload): Promise<void> {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) throw new Error('Not authenticated. Please sign in again.');
-
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: payload.name,
-          email: payload.email,
-          password: payload.password,
-          role: payload.role,
-          initialCustomerId: payload.initialCustomerId ?? null,
-        }),
+    const { error: fnErr } = await supabase.functions.invoke('admin-create-user', {
+      body: {
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role,
+        initialCustomerId: payload.initialCustomerId ?? null,
       },
-    );
-
-    const body = await res.json().catch(() => ({} as { error?: string }));
-    if (!res.ok) {
-      throw new Error(body?.error || `User creation failed (HTTP ${res.status}).`);
+    });
+    if (fnErr) {
+      // Surface edge-function error body when available.
+      let msg = fnErr.message || 'Could not create user.';
+      const res = (fnErr as { context?: Response }).context;
+      if (res) {
+        try {
+          const json = await res.clone().json() as { error?: string; message?: string };
+          msg = json.error ?? json.message ?? msg;
+        } catch {
+          try {
+            const text = await res.clone().text();
+            if (text) msg = text;
+          } catch {
+            // keep original fnErr message
+          }
+        }
+      }
+      throw new Error(msg);
     }
 
     await fetchProfiles();

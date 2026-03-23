@@ -72,19 +72,32 @@ export function useProfiles() {
   }
 
   async function createUser(payload: CreateUserPayload): Promise<void> {
-    const { error: fnErr } = await supabase.functions.invoke('admin-create-user', {
-      body: {
-        name: payload.name,
-        email: payload.email,
-        password: payload.password,
-        role: payload.role,
-        initialCustomerId: payload.initialCustomerId ?? null,
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error('Not authenticated. Please sign in again.');
+
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: payload.name,
+          email: payload.email,
+          password: payload.password,
+          role: payload.role,
+          initialCustomerId: payload.initialCustomerId ?? null,
+        }),
       },
-    });
-    if (fnErr) {
-      throw new Error(
-        fnErr.message || 'Could not create user. Ensure admin-create-user edge function is deployed.',
-      );
+    );
+
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    if (!res.ok) {
+      throw new Error(body?.error || `User creation failed (HTTP ${res.status}).`);
     }
 
     await fetchProfiles();

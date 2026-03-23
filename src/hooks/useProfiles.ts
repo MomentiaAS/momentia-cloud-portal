@@ -72,7 +72,21 @@ export function useProfiles() {
   }
 
   async function createUser(payload: CreateUserPayload): Promise<void> {
+    let { data: sessionData } = await supabase.auth.getSession();
+    let accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) throw new Error(`Authentication refresh failed: ${refreshErr.message}`);
+      accessToken = refreshed.session?.access_token;
+    }
+    if (!accessToken) {
+      throw new Error('Authentication session is missing. Please sign out and sign in again.');
+    }
+
     const { error: fnErr } = await supabase.functions.invoke('admin-create-user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: {
         name: payload.name,
         email: payload.email,

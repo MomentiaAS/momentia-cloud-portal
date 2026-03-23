@@ -323,6 +323,13 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 function AlertsTab({ alerts, highlightedAlertId }: { alerts: Alert[]; highlightedAlertId?: string | null }) {
   const open = alerts.filter(a => !a.resolved);
   const resolved = alerts.filter(a => a.resolved);
+  const highlightedRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!highlightedAlertId) return;
+    if (!highlightedRef.current) return;
+    highlightedRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightedAlertId, alerts.length]);
 
   if (alerts.length === 0) return (
     <div className="py-10 text-center text-sm text-text-muted">No alerts recorded for this customer.</div>
@@ -333,6 +340,7 @@ function AlertsTab({ alerts, highlightedAlertId }: { alerts: Alert[]; highlighte
       {[...open, ...resolved].map(alert => (
         <div
           key={alert.id}
+          ref={highlightedAlertId === alert.id ? highlightedRef : undefined}
           className={cn(
             'flex items-start gap-3 px-4 py-3',
             alert.resolved && 'opacity-50',

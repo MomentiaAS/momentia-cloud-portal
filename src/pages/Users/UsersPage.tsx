@@ -269,6 +269,7 @@ function UserRow({
   const [assignSaving,   setAssignSaving]   = useState(false);
   const [assignSaved,    setAssignSaved]    = useState(false);
   const [assignError,    setAssignError]    = useState<string | null>(null);
+  const [passwordOpen,   setPasswordOpen]   = useState(false);
   const [passwordDraft,  setPasswordDraft]  = useState('');
   const [passwordBusy,   setPasswordBusy]   = useState(false);
   const [passwordSaved,  setPasswordSaved]  = useState(false);
@@ -391,33 +392,6 @@ function UserRow({
               </span>
             )}
           </div>
-
-          {isSuperAdmin && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                Set / Reset Password
-              </p>
-              <div className="flex items-start gap-2">
-                <input
-                  type="password"
-                  className={inputClass}
-                  value={passwordDraft}
-                  onChange={e => { setPasswordDraft(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
-                  placeholder="New temporary password"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handlePasswordSave()}
-                  disabled={passwordBusy || passwordDraft.trim().length < 8}
-                >
-                  {passwordBusy ? 'Saving…' : 'Set Password'}
-                </Button>
-              </div>
-              {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
-              <p className="text-xs text-text-muted">Minimum 8 characters.</p>
-            </div>
-          )}
           <p className="text-xs text-text-muted truncate">{profile.email}</p>
         </div>
         <div className="hidden sm:block shrink-0">
@@ -476,6 +450,47 @@ function UserRow({
             </div>
           </div>
 
+          {isSuperAdmin && (
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPasswordOpen(v => !v);
+                  setPasswordError(null);
+                  if (passwordOpen) setPasswordDraft('');
+                }}
+              >
+                {passwordOpen ? 'Cancel' : 'Change password'}
+              </Button>
+
+              {passwordOpen && (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 max-w-2xl">
+                    <input
+                      type="password"
+                      className={inputClass}
+                      value={passwordDraft}
+                      onChange={e => { setPasswordDraft(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
+                      placeholder="New temporary password"
+                    />
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => void handlePasswordSave()}
+                      disabled={passwordBusy || passwordDraft.trim().length < 8}
+                    >
+                      {passwordBusy ? 'Saving…' : 'Set password'}
+                    </Button>
+                  </div>
+                  {passwordSaved && <p className="text-xs text-emerald-500">Password updated.</p>}
+                  {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+                  <p className="text-xs text-text-muted">Minimum 8 characters.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Customer assignments — only for technician / viewer */}
           {needsCustomerScope && (
             <div className="space-y-2">
@@ -531,7 +546,7 @@ function UserRow({
           <div className="flex items-center justify-between pt-1">
             {(canEditUserNames || (isSuperAdmin && needsCustomerScope)) ? (
               <div className="flex items-center gap-2">
-                {(nameSaved || assignSaved || passwordSaved) && (
+                {(nameSaved || assignSaved) && (
                   <span className="text-xs text-emerald-500">Saved!</span>
                 )}
                 {assignError && <span className="text-xs text-red-500">{assignError}</span>}

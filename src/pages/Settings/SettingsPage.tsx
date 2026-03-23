@@ -445,7 +445,7 @@ export function SettingsPage() {
 
   const displayName = profile?.name ?? profile?.email ?? 'User';
   const roleLabel   = profile?.role
-    ? { superadmin: 'Super Admin', admin: 'Admin', technician: 'Technician', viewer: 'Viewer' }[profile.role] ?? profile.role
+    ? { superadmin: 'Super Admin', admin: 'Admin', technician: 'Technician', viewer: 'Customer' }[profile.role] ?? profile.role
     : '—';
 
   return (

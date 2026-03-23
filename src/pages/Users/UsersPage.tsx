@@ -18,7 +18,7 @@ const ROLES: { value: UserRole; label: string; icon: React.ElementType; color: s
   { value: 'superadmin', label: 'Super Admin', icon: Shield, color: 'text-accent' },
   { value: 'admin',      label: 'Admin',       icon: Shield, color: 'text-blue-500' },
   { value: 'technician', label: 'Technician',  icon: Wrench, color: 'text-emerald-500' },
-  { value: 'viewer',     label: 'Viewer',      icon: Eye,    color: 'text-text-muted' },
+  { value: 'viewer',     label: 'Customer',    icon: Eye,    color: 'text-text-muted' },
 ];
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -683,7 +683,7 @@ export function UsersPage() {
                 {r.value === 'superadmin' && 'Full access, manage users'}
                 {r.value === 'admin'      && 'Full data access, view users'}
                 {r.value === 'technician' && 'Edit assigned customers'}
-                {r.value === 'viewer'     && 'View assigned customers'}
+                {r.value === 'viewer'     && 'Customer portal access'}
               </span>
             </div>
           );

@@ -75,6 +75,11 @@ export function Sidebar({ mobile }: SidebarProps) {
   const { setSidebarOpen } = useApp();
   const { profile }        = useAuth();
   const canViewUsers  = profile?.role === 'superadmin' || profile?.role === 'admin';
+  const topNavItems = topNav.map(item =>
+    item.to === '/customers' && profile?.role === 'viewer'
+      ? { ...item, label: 'My Services' }
+      : item,
+  );
 
   const handleNav = () => {
     if (mobile) setSidebarOpen(false);
@@ -120,7 +125,7 @@ export function Sidebar({ mobile }: SidebarProps) {
         <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-muted">
           Navigation
         </p>
-        {topNav.map(item => (
+        {topNavItems.map(item => (
           <NavItemRow key={item.to} item={item} onClick={handleNav} />
         ))}
       </div>

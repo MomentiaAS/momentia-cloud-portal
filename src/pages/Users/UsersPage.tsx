@@ -247,13 +247,14 @@ interface UserRowProps {
   allCustomers:         { id: string; name: string }[];
   onRoleChange:         (id: string, role: UserRole) => Promise<void>;
   onNameSave:           (id: string, name: string) => Promise<void>;
+  onSetPassword:        (id: string, password: string) => Promise<void>;
   onDelete:             (id: string, name: string) => void;
   onFetchAssignments:   (userId: string) => Promise<string[]>;
   onSaveAssignments:    (userId: string, ids: string[]) => Promise<void>;
 }
 
 function UserRow({
-  profile, isSelf, isSuperAdmin, canEditUserNames, allCustomers, onRoleChange, onNameSave, onDelete,
+  profile, isSelf, isSuperAdmin, canEditUserNames, allCustomers, onRoleChange, onNameSave, onSetPassword, onDelete,
   onFetchAssignments, onSaveAssignments,
 }: UserRowProps) {
 
@@ -268,6 +269,10 @@ function UserRow({
   const [assignSaving,   setAssignSaving]   = useState(false);
   const [assignSaved,    setAssignSaved]    = useState(false);
   const [assignError,    setAssignError]    = useState<string | null>(null);
+  const [passwordDraft,  setPasswordDraft]  = useState('');
+  const [passwordBusy,   setPasswordBusy]   = useState(false);
+  const [passwordSaved,  setPasswordSaved]  = useState(false);
+  const [passwordError,  setPasswordError]  = useState<string | null>(null);
 
   const needsCustomerScope = profile.role === 'technician' || profile.role === 'viewer';
 
@@ -335,6 +340,22 @@ function UserRow({
     }
   }
 
+  async function handlePasswordSave() {
+    if (!passwordDraft.trim()) return;
+    setPasswordBusy(true);
+    setPasswordError(null);
+    try {
+      await onSetPassword(profile.id, passwordDraft.trim());
+      setPasswordDraft('');
+      setPasswordSaved(true);
+      setTimeout(() => setPasswordSaved(false), 2000);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to set password.');
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
   const nameDraftTrimmed = nameDraft.trim();
   const currentNameTrimmed = (profile.name ?? '').trim();
   const canSaveName = canEditUserNames && !!nameDraftTrimmed && nameDraftTrimmed !== currentNameTrimmed;
@@ -370,6 +391,33 @@ function UserRow({
               </span>
             )}
           </div>
+
+          {isSuperAdmin && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                Set / Reset Password
+              </p>
+              <div className="flex items-start gap-2">
+                <input
+                  type="password"
+                  className={inputClass}
+                  value={passwordDraft}
+                  onChange={e => { setPasswordDraft(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
+                  placeholder="New temporary password"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handlePasswordSave()}
+                  disabled={passwordBusy || passwordDraft.trim().length < 8}
+                >
+                  {passwordBusy ? 'Saving…' : 'Set Password'}
+                </Button>
+              </div>
+              {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+              <p className="text-xs text-text-muted">Minimum 8 characters.</p>
+            </div>
+          )}
           <p className="text-xs text-text-muted truncate">{profile.email}</p>
         </div>
         <div className="hidden sm:block shrink-0">
@@ -483,7 +531,7 @@ function UserRow({
           <div className="flex items-center justify-between pt-1">
             {(canEditUserNames || (isSuperAdmin && needsCustomerScope)) ? (
               <div className="flex items-center gap-2">
-                {(nameSaved || assignSaved) && (
+                {(nameSaved || assignSaved || passwordSaved) && (
                   <span className="text-xs text-emerald-500">Saved!</span>
                 )}
                 {assignError && <span className="text-xs text-red-500">{assignError}</span>}
@@ -521,7 +569,7 @@ function UserRow({
 export function UsersPage() {
   const { profile: currentProfile }                         = useAuth();
   const { profiles, loading, error, fetchProfiles,
-          updateRole, updateName, createUser, deleteProfile,
+          updateRole, updateName, createUser, setUserPassword, deleteProfile,
           fetchAssignedCustomers, setCustomerAssignments }   = useProfiles();
   const { customers }                                       = useCustomers();
 
@@ -548,6 +596,17 @@ export function UsersPage() {
       await updateName(id, name);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to update name.';
+      setPageError(msg);
+      throw err;
+    }
+  }
+
+  async function handleSetPassword(id: string, password: string) {
+    setPageError(null);
+    try {
+      await setUserPassword(id, password);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to set password.';
       setPageError(msg);
       throw err;
     }
@@ -650,6 +709,7 @@ export function UsersPage() {
                   allCustomers={allCustomers}
                   onRoleChange={handleRoleChange}
                   onNameSave={handleNameSave}
+                  onSetPassword={handleSetPassword}
                   onDelete={(id, name) => setDeleteTarget({ id, name })}
                   onFetchAssignments={fetchAssignedCustomers}
                   onSaveAssignments={setCustomerAssignments}

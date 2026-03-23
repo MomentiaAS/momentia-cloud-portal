@@ -118,6 +118,41 @@ export function useProfiles() {
     await fetchProfiles();
   }
 
+  async function setUserPassword(userId: string, newPassword: string): Promise<void> {
+    const trimmed = newPassword.trim();
+    if (trimmed.length < 8) {
+      throw new Error('Password must be at least 8 characters.');
+    }
+
+    let { data: sessionData } = await supabase.auth.getSession();
+    let accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) throw new Error(`Authentication refresh failed: ${refreshErr.message}`);
+      accessToken = refreshed.session?.access_token;
+    }
+    if (!accessToken) {
+      throw new Error('Authentication session is missing. Please sign out and sign in again.');
+    }
+
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-set-user-password`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, newPassword: trimmed }),
+      },
+    );
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    if (!res.ok) {
+      throw new Error(body.error || `Password reset failed (HTTP ${res.status}).`);
+    }
+  }
+
   async function deleteProfile(id: string): Promise<void> {
     // Removes the profile row; the user's auth.users entry remains but the
     // app treats a missing profile as an unauthorised session and signs them out.
@@ -176,6 +211,7 @@ export function useProfiles() {
     updateRole,
     updateName,
     createUser,
+    setUserPassword,
     deleteProfile,
     fetchAssignedCustomers,
     assignCustomer,

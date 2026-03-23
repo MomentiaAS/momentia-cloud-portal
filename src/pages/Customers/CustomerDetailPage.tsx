@@ -139,6 +139,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
   const { assets, loading, error, addAsset, editAsset, removeAsset } = useCustomerAssets(customerId);
   const [formOpen,  setFormOpen]  = useState(false);
   const [editing,   setEditing]   = useState<Asset | null>(null);
+  const [selected,  setSelected]  = useState<Asset | null>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -188,7 +189,12 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
             const Icon = ASSET_TYPE_ICON[asset.type] ?? Package;
             const ws   = warrantyStatus(asset.warrantyEnd);
             return (
-              <div key={asset.id} className="flex items-start gap-3 px-4 py-3">
+              <button
+                key={asset.id}
+                type="button"
+                onClick={() => setSelected(asset)}
+                className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-primary-50/40 dark:hover:bg-primary-800/20 transition-colors"
+              >
                 <div className="size-8 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 mt-0.5">
                   <Icon className="size-4 text-text-muted" />
                 </div>
@@ -219,15 +225,24 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                 </div>
                 {canEdit && (
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => { setEditing(asset); setFormOpen(true); }} className="p-1 rounded text-text-muted hover:text-accent transition-colors">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setEditing(asset); setFormOpen(true); }}
+                      className="p-1 rounded text-text-muted hover:text-accent transition-colors"
+                    >
                       <Pencil className="size-3.5" />
                     </button>
-                    <button onClick={() => setDeleteId(asset.id)} className="p-1 rounded text-text-muted hover:text-red-500 transition-colors">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDeleteId(asset.id); }}
+                      className="p-1 rounded text-text-muted hover:text-red-500 transition-colors"
+                    >
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
                 )}
-              </div>
+                <ChevronRight className="size-3.5 text-text-muted shrink-0 mt-1" />
+              </button>
             );
           })}
         </div>
@@ -246,6 +261,50 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Asset detail drawer */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
+          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selected.name}</h3>
+              <Button variant="ghost" size="icon" onClick={() => setSelected(null)} aria-label="Close">
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                {[
+                  ['Type', selected.type],
+                  ['Status', selected.status],
+                  ['Make', selected.make ?? '—'],
+                  ['Model', selected.model ?? '—'],
+                  ['Serial', selected.serial ?? '—'],
+                  ['Operating system', selected.os ?? '—'],
+                  ['Assigned to', selected.assignedTo ?? '—'],
+                  ['IP address', selected.ipAddress ?? '—'],
+                  ['MAC address', selected.macAddress ?? '—'],
+                  ['Location', selected.location ?? '—'],
+                  ['Purchase date', selected.purchaseDate ?? '—'],
+                  ['Warranty', selected.warrantyEnd ?? '—'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-text-muted uppercase tracking-wider">{label}</dt>
+                    <dd className="text-text-primary mt-0.5 break-words">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {selected.notes && (
+                <div>
+                  <p className="text-xs text-text-muted uppercase tracking-wider">Notes</p>
+                  <p className="text-sm text-text-primary mt-1 whitespace-pre-wrap">{selected.notes}</p>
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       )}
 

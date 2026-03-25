@@ -54,7 +54,9 @@ export function NotificationsPage() {
     setSyncing(true);
 
     try {
-      const unifiCustomers = customers.filter(c => c.integrations.unifi && c.unifiSiteId);
+      // Some existing customers may not have integrations.unifi set (legacy JSON),
+      // so rely on unifiSiteId as the source of truth for syncing.
+      const unifiCustomers = customers.filter(c => !!c.unifiSiteId);
       await Promise.allSettled(
         unifiCustomers.map(async (customer) => {
           try {
@@ -111,11 +113,9 @@ export function NotificationsPage() {
 
   // Sync on page load (once customers are loaded)
   useEffect(() => {
-    if (customers.length > 0) {
-      void syncUniFiAlerts();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers.length]);
+    if (!profile) return;
+    if (customers.length > 0) void syncUniFiAlerts();
+  }, [customers.length, profile, syncUniFiAlerts]);
   // ── End UniFi offline alert sync ─────────────────────────────────────────
 
   const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? '—';

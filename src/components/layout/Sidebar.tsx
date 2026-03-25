@@ -7,6 +7,8 @@ import { cn } from '../ui/cn';
 import { CountBadge } from '../ui/Badge';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAlerts } from '../../hooks/useAlerts';
+import { useAllAssets } from '../../hooks/useAssets';
 
 interface NavItem {
   label:    string;
@@ -24,7 +26,7 @@ const topNav: NavItem[] = [
 ];
 
 const bottomNav: NavItem[] = [
-  { label: 'Notifications', to: '/notifications', icon: Bell, badge: 4 },
+  { label: 'Notifications', to: '/notifications', icon: Bell },
   { label: 'Settings',      to: '/settings',      icon: Settings },
 ];
 
@@ -74,6 +76,8 @@ interface SidebarProps {
 export function Sidebar({ mobile }: SidebarProps) {
   const { setSidebarOpen } = useApp();
   const { profile }        = useAuth();
+  const { alerts }         = useAlerts(false);
+  const { assets }         = useAllAssets();
   const canViewUsers  = profile?.role === 'superadmin' || profile?.role === 'admin';
   const topNavItems = topNav.map(item =>
     item.to === '/customers' && profile?.role === 'viewer'
@@ -84,6 +88,18 @@ export function Sidebar({ mobile }: SidebarProps) {
   const handleNav = () => {
     if (mobile) setSidebarOpen(false);
   };
+
+  const warrantyCount = assets.filter(a => {
+    if (!a.warrantyEnd) return false;
+    const days = Math.floor((new Date(a.warrantyEnd).getTime() - Date.now()) / 86_400_000);
+    return days < 90;
+  }).length;
+  const notificationCount = alerts.length + warrantyCount;
+  const bottomNavItems = bottomNav.map(item =>
+    item.to === '/notifications'
+      ? { ...item, badge: notificationCount }
+      : item,
+  );
 
   return (
     <nav
@@ -147,7 +163,7 @@ export function Sidebar({ mobile }: SidebarProps) {
         <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-muted">
           Account
         </p>
-        {bottomNav.map(item => (
+        {bottomNavItems.map(item => (
           <NavItemRow key={item.to} item={item} onClick={handleNav} />
         ))}
       </div>

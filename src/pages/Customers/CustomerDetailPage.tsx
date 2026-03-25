@@ -522,6 +522,14 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
   const { status, loading, error, reload } = useUnifiStatus(siteId);
   const { profile } = useAuth();
 
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const [clientsOpen, setClientsOpen] = useState(false);
+
+  const isOfflineState = (s?: string | null) => {
+    const v = String(s ?? '').toLowerCase();
+    return v === 'offline' || v === 'disconnected';
+  };
+
   // After the first successful fetch, compute health and persist it.
   const savedRef = useRef(false);
   useEffect(() => {
@@ -661,6 +669,12 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
   const totalClients   = (wiredClients != null && wifiClients != null)
     ? wiredClients + wifiClients : null;
 
+  const devices = status?.devices ?? [];
+  const clients = status?.clients ?? [];
+
+  const sortedDevices = [...devices].sort((a, b) => Number(isOfflineState(b.state)) - Number(isOfflineState(a.state)));
+  const sortedClients = [...clients].sort((a, b) => Number(isOfflineState(b.state)) - Number(isOfflineState(a.state)));
+
   return (
     <div className="p-4 space-y-4">
 
@@ -717,12 +731,16 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
       <div>
         <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">Devices &amp; Clients</h4>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className={cn(
+          <button
+            type="button"
+            onClick={() => setDevicesOpen(true)}
+            className={cn(
             'p-3 rounded-lg border flex items-center gap-3',
             offlineDevices > 0
               ? 'bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-800/50'
               : 'bg-surface border-border',
-          )}>
+            )}
+          >
             <Server className={cn('size-5 shrink-0', offlineDevices > 0 ? 'text-red-500' : 'text-text-muted')} />
             <div>
               <p className={cn('text-xs', offlineDevices > 0 ? 'text-red-500' : 'text-text-muted')}>Devices</p>
@@ -733,9 +751,13 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
                 <p className="text-xs text-red-500">{offlineDevices} offline</p>
               )}
             </div>
-          </div>
+          </button>
 
-          <div className="p-3 rounded-lg bg-surface border border-border flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setClientsOpen(true)}
+            className="p-3 rounded-lg bg-surface border border-border flex items-center gap-3"
+          >
             <UsersIcon className="size-5 text-text-muted shrink-0" />
             <div>
               <p className="text-xs text-text-muted">Clients</p>
@@ -744,7 +766,7 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
                 <p className="text-xs text-text-muted">{wiredClients} wired · {wifiClients} wifi</p>
               )}
             </div>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -752,6 +774,106 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
         <div className="text-center py-6 text-sm text-text-muted">
           No data returned for site <code className="font-mono text-xs">{siteId}</code>.
           Verify the Site ID is correct.
+        </div>
+      )}
+
+      {/* Devices drawer */}
+      {devicesOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDevicesOpen(false)} />
+          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="text-base font-semibold text-text-primary">
+                Devices ({devices.length})
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setDevicesOpen(false)} aria-label="Close">
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+              {sortedDevices.length === 0 ? (
+                <p className="text-sm text-text-muted">No device inventory returned.</p>
+              ) : (
+                sortedDevices.map(d => {
+                  const offline = isOfflineState(d.state);
+                  return (
+                    <div key={`${d.mac ?? ''}|${d.ipAddress ?? ''}|${d.name ?? ''}`} className={cn(
+                      'p-3 rounded-lg border bg-surface',
+                      offline ? 'border-red-200 dark:border-red-800 bg-red-50/30' : 'border-border',
+                    )}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary truncate">
+                            {d.name ?? 'Unknown device'}
+                          </p>
+                          <p className="text-xs text-text-muted mt-1 font-mono break-all">
+                            {d.ipAddress ?? '—'}
+                          </p>
+                          {d.mac && (
+                            <p className="text-xs text-text-muted font-mono break-all">{d.mac}</p>
+                          )}
+                          {d.type && <p className="text-xs text-text-muted mt-1">{d.type}</p>}
+                        </div>
+                        <Badge variant={offline ? 'danger' : 'default'}>
+                          {offline ? 'Offline' : 'Online'}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Clients drawer */}
+      {clientsOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setClientsOpen(false)} />
+          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="text-base font-semibold text-text-primary">
+                Clients ({clients.length})
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => setClientsOpen(false)} aria-label="Close">
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+              {sortedClients.length === 0 ? (
+                <p className="text-sm text-text-muted">No client inventory returned.</p>
+              ) : (
+                sortedClients.map(d => {
+                  const offline = isOfflineState(d.state);
+                  return (
+                    <div key={`${d.mac ?? ''}|${d.ipAddress ?? ''}|${d.name ?? ''}`} className={cn(
+                      'p-3 rounded-lg border bg-surface',
+                      offline ? 'border-red-200 dark:border-red-800 bg-red-50/30' : 'border-border',
+                    )}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary truncate">
+                            {d.name ?? 'Unknown client'}
+                          </p>
+                          <p className="text-xs text-text-muted mt-1 font-mono break-all">
+                            {d.ipAddress ?? '—'}
+                          </p>
+                          {d.mac && (
+                            <p className="text-xs text-text-muted font-mono break-all">{d.mac}</p>
+                          )}
+                          {d.type && <p className="text-xs text-text-muted mt-1">{d.type}</p>}
+                        </div>
+                        <Badge variant={offline ? 'danger' : 'default'}>
+                          {offline ? 'Offline' : 'Online'}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </aside>
         </div>
       )}
     </div>

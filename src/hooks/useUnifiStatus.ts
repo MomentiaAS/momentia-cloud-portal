@@ -85,11 +85,30 @@ export interface UniFiInfraOfflineDevice {
   state?:     string;
 }
 
+export interface UnifiDevice {
+  name?:      string;
+  ipAddress?: string;
+  mac?:       string;
+  type?:      string;
+  state?:     string;
+}
+
+export interface UnifiClient {
+  name?:      string;
+  ipAddress?: string;
+  mac?:       string;
+  type?:      string;
+  state?:     string;
+}
+
 export interface UnifiStatus {
   site: UnifiSite | null;
   host: UnifiHost | null;
   // Best-effort enrichment from the edge function.
   infraOfflineDevices?: UniFiInfraOfflineDevice[];
+  // Best-effort inventory for UI drawers.
+  devices?: UnifiDevice[];
+  clients?: UnifiClient[];
 }
 
 export interface UnifiSiteListItem {

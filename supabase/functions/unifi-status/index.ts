@@ -10,7 +10,11 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const UNIFI_API_KEY = Deno.env.get('UNIFI_API_KEY') ?? '';
-const UNIFI_BASE    = 'https://api.ui.com';
+const UNIFI_BASE = Deno.env.get('UNIFI_BASE') ?? 'https://api.ui.com';
+// Some UniFi installations expose proxy/network endpoints under a different host
+// (e.g. `https://<id>.id.ui.direct`). When this is configured, proxy calls can
+// fall back to it if `api.ui.com` returns 401/403.
+const UNIFI_DIRECT_BASE = Deno.env.get('UNIFI_DIRECT_BASE') ?? '';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -25,8 +29,8 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function unifi(path: string) {
-  const res = await fetch(`${UNIFI_BASE}${path}`, {
+async function unifi(base: string, path: string) {
+  const res = await fetch(`${base}${path}`, {
     headers: { 'X-API-KEY': UNIFI_API_KEY, 'Accept': 'application/json' },
   });
   if (!res.ok) {
@@ -34,6 +38,21 @@ async function unifi(path: string) {
     throw new Error(`UniFi API ${res.status}: ${text}`);
   }
   return res.json();
+}
+
+async function unifiProxy(path: string) {
+  const bases = [UNIFI_BASE];
+  if (UNIFI_DIRECT_BASE) bases.push(UNIFI_DIRECT_BASE);
+
+  let lastErr: unknown = null;
+  for (const base of bases) {
+    try {
+      return await unifi(base, path);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -161,8 +180,16 @@ serve(async (req) => {
         // UniFi cloud sometimes exposes device lists via v2 proxy endpoints.
         // These endpoints typically return offline/online device records with
         // name + ip-ish fields depending on the key and UniFi version.
-        { key: 'proxy_v2_site_default_device', promise: unifi(`/proxy/network/v2/api/site/default/device`) },
-        { key: 'proxy_v2_site_siteId_device', promise: unifi(`/proxy/network/v2/api/site/${siteId}/device`) },
+        { key: 'proxy_v2_site_default_device', promise: unifiProxy(`/proxy/network/v2/api/site/default/device`) },
+        { key: 'proxy_v2_site_siteId_device', promise: unifiProxy(`/proxy/network/v2/api/site/${siteId}/device`) },
+
+        // Another observed variant in the browser:
+        // `/proxy/network/api/s/<site>/stat/device` and `/stat/client`.
+        // We call both `default` and the provided `siteId`.
+        { key: 'proxy_api_s_default_stat_device', promise: unifiProxy(`/proxy/network/api/s/default/stat/device`) },
+        { key: 'proxy_api_s_siteId_stat_device', promise: unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`) },
+        { key: 'proxy_api_s_default_stat_client', promise: unifiProxy(`/proxy/network/api/s/default/stat/client`) },
+        { key: 'proxy_api_s_siteId_stat_client', promise: unifiProxy(`/proxy/network/api/s/${siteId}/stat/client`) },
       );
     }
 
@@ -286,8 +313,11 @@ serve(async (req) => {
     let infraOfflineDevices: AnyObj[] = [];
     try {
       const candidateResponses = await Promise.allSettled([
-        unifi(`/proxy/network/v2/api/site/default/device`),
-        unifi(`/proxy/network/v2/api/site/${siteId}/device`),
+        unifiProxy(`/proxy/network/v2/api/site/default/device`),
+        unifiProxy(`/proxy/network/v2/api/site/${siteId}/device`),
+        // Additional inventory variants (often return name/ip + state).
+        unifiProxy(`/proxy/network/api/s/default/stat/device`),
+        unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`),
 
         // Fallbacks (may return consoles only depending on API key)
         unifi(`/v1/sites/${siteId}/devices`),
@@ -322,7 +352,62 @@ serve(async (req) => {
       infraOfflineDevices = [];
     }
 
-    return json({ site, host, infraOfflineDevices });
+    // Best-effort device/client inventory for UI drawers.
+    let devicesRaw: AnyObj[] = [];
+    let clientsRaw: AnyObj[] = [];
+
+    try {
+      const deviceResponses = await Promise.allSettled([
+        unifiProxy(`/proxy/network/api/s/default/stat/device`),
+        unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`),
+        unifiProxy(`/proxy/network/v2/api/site/default/device`),
+        unifiProxy(`/proxy/network/v2/api/site/${siteId}/device`),
+        unifi(`/v1/sites/${siteId}/devices`),
+        unifi(`/v1/sites/${siteId}/hosts`),
+      ]);
+
+      for (const c of deviceResponses) {
+        if (c.status !== 'fulfilled') continue;
+        devicesRaw.push(...collectArrayCandidates(c.value as AnyObj));
+      }
+    } catch { /* non-fatal */ }
+
+    try {
+      const clientResponses = await Promise.allSettled([
+        unifiProxy(`/proxy/network/api/s/default/stat/client`),
+        unifiProxy(`/proxy/network/api/s/${siteId}/stat/client`),
+        unifi(`/v1/sites/${siteId}/clients`),
+      ]);
+
+      for (const c of clientResponses) {
+        if (c.status !== 'fulfilled') continue;
+        clientsRaw.push(...collectArrayCandidates(c.value as AnyObj));
+      }
+    } catch { /* non-fatal */ }
+
+    const devices = uniqByKey(
+      devicesRaw,
+      (d: AnyObj) => `${pickDeviceMac(d) ?? ''}|${pickDeviceIp(d) ?? ''}|${pickDeviceName(d) ?? ''}`,
+    ).map((d: AnyObj) => ({
+      name: pickDeviceName(d),
+      ipAddress: pickDeviceIp(d),
+      mac: pickDeviceMac(d),
+      type: d?.type ?? d?.hardwareType ?? d?.deviceType ?? null,
+      state: d?.reportedState?.state ?? d?.state ?? d?.status ?? null,
+    })).slice(0, 200);
+
+    const clients = uniqByKey(
+      clientsRaw,
+      (d: AnyObj) => `${pickDeviceMac(d) ?? ''}|${pickDeviceIp(d) ?? ''}|${pickDeviceName(d) ?? ''}`,
+    ).map((d: AnyObj) => ({
+      name: pickDeviceName(d),
+      ipAddress: pickDeviceIp(d),
+      mac: pickDeviceMac(d),
+      type: d?.type ?? d?.deviceType ?? null,
+      state: d?.reportedState?.state ?? d?.state ?? d?.status ?? null,
+    })).slice(0, 200);
+
+    return json({ site, host, infraOfflineDevices, devices, clients });
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

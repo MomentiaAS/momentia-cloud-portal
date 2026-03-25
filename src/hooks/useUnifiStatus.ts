@@ -7,6 +7,10 @@ export interface UnifiSiteStats {
   counts?: {
     totalDevice?:        number;
     offlineDevice?:      number;
+    // Device-type specific offline counters (used for UniFi gateway vs infra alerts)
+    offlineGatewayDevice?: number;
+    offlineWiredDevice?:   number;
+    offlineWifiDevice?:    number;
     wiredClient?:        number;
     wifiClient?:         number;
     guestClient?:        number;

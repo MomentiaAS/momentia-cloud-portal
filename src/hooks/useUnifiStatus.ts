@@ -116,8 +116,13 @@ export function useUnifiStatus(siteId: string | undefined) {
     setLoading(true);
     setError(null);
     try {
+      // Edge Functions are protected: pass the current user's JWT explicitly.
+      // This avoids race conditions where the supabase-js session isn't ready yet.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
       const { data, error: fnErr } = await supabase.functions.invoke('unifi-status', {
         body: { site_id: siteId },
+        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
       });
       if (fnErr) throw new Error(fnErr.message);
       if (data?.error) throw new Error(data.error);
@@ -145,8 +150,11 @@ export function useUnifiSites() {
     setLoading(true);
     setError(null);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
       const { data, error: fnErr } = await supabase.functions.invoke('unifi-status', {
         body: {},
+        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
       });
       if (fnErr) throw new Error(fnErr.message);
       if (data?.error) throw new Error(data.error);

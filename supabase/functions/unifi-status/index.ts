@@ -76,11 +76,27 @@ function isProbablyOffline(d: AnyObj): boolean {
     d?.reportedState?.state ??
     d?.state ??
     d?.reportedState?.connectionState ??
-    d?.connectionState
+    d?.connectionState ??
+    d?.status ??
+    d?.deviceState
   );
   if (!state) return false;
   const s = String(state).toLowerCase();
   return s === 'disconnected' || s === 'offline';
+}
+
+function collectArrayCandidates(payload: AnyObj): AnyObj[] {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+
+  const out: AnyObj[] = [];
+  const maybeData = (payload as AnyObj).data;
+  if (Array.isArray(maybeData)) out.push(...maybeData);
+
+  for (const [_, v] of Object.entries(payload)) {
+    if (Array.isArray(v)) out.push(...v);
+  }
+  return out;
 }
 
 function isProbablyInfraDevice(d: AnyObj): boolean {
@@ -142,11 +158,59 @@ serve(async (req) => {
         { key: 'site_hosts_v1', promise: unifi(`/v1/sites/${siteId}/hosts`) },
         { key: 'site_clients_v1', promise: unifi(`/v1/sites/${siteId}/clients`) },
         { key: 'hosts_site_id', promise: unifi(`/v1/hosts?site_id=${siteId}`) },
+        // UniFi cloud sometimes exposes device lists via v2 proxy endpoints.
+        // These endpoints typically return offline/online device records with
+        // name + ip-ish fields depending on the key and UniFi version.
+        { key: 'proxy_v2_site_default_device', promise: unifi(`/proxy/network/v2/api/site/default/device`) },
+        { key: 'proxy_v2_site_siteId_device', promise: unifi(`/proxy/network/v2/api/site/${siteId}/device`) },
       );
     }
 
     const settled = await Promise.allSettled(reqs.map(r => r.promise));
     const results: AnyObj = {};
+
+    // Extra debug info: sample offline infra devices from global /v1/hosts.
+    // This helps determine whether we can derive per-site infra details from host objects.
+    const hostsSettledIndex = reqs.findIndex(r => r.key === 'hosts');
+    let offlineInfraHostsSample: AnyObj[] = [];
+    let offlineNonConsoleHostsSample: AnyObj[] = [];
+    if (hostsSettledIndex >= 0) {
+      const hostRes = settled[hostsSettledIndex];
+      if (hostRes.status === 'fulfilled') {
+        const hostsData = (hostRes.value as AnyObj)?.data;
+        const arr = Array.isArray(hostsData) ? hostsData : [];
+
+        const offlineHosts = arr.filter(isProbablyOffline).slice(0, 20);
+        const offlineNonConsole = offlineHosts.filter(d => {
+          const t = String(d?.type ?? '').toLowerCase();
+          return t !== 'console' && t !== 'gateway' && t !== 'controller';
+        });
+
+        offlineInfraHostsSample = offlineNonConsole
+          .filter(isProbablyInfraDevice)
+          .slice(0, 10)
+          .map((d: AnyObj) => ({
+            name: pickDeviceName(d),
+            ipAddress: pickDeviceIp(d) ?? null,
+            mac: pickDeviceMac(d) ?? null,
+            type: d?.type ?? d?.deviceType ?? null,
+            reportedShortname: d?.reportedState?.hardware?.shortname ?? d?.hardware?.shortname ?? null,
+            siteId: d?.siteId ?? d?.site_id ?? d?.site ?? null,
+            state: d?.reportedState?.state ?? d?.state ?? d?.status ?? null,
+          }));
+
+        offlineNonConsoleHostsSample = offlineNonConsole.slice(0, 10).map((d: AnyObj) => ({
+          name: pickDeviceName(d),
+          type: d?.type ?? null,
+          shortname: d?.reportedState?.hardware?.shortname ?? d?.hardware?.shortname ?? null,
+          ipAddress: pickDeviceIp(d) ?? null,
+          mac: pickDeviceMac(d) ?? null,
+          reportedState: d?.reportedState?.state ?? null,
+          // Keep state-related fields for troubleshooting
+          rawState: d?.reportedState?.connectionState ?? d?.state ?? d?.status ?? null,
+        }));
+      }
+    }
 
     for (let i = 0; i < settled.length; i++) {
       const k = reqs[i].key;
@@ -155,15 +219,27 @@ serve(async (req) => {
         results[k] = { error: String(r.reason) };
         continue;
       }
-      const data = (r.value as AnyObj)?.data;
+      const val = r.value as AnyObj;
+      const data = val?.data;
       const arr = Array.isArray(data) ? data : [];
+      const nonNull = arr.filter(x => x != null);
+
+      // Some endpoints (notably /proxy/network/v2/...) may return arrays
+      // nested under properties instead of a direct `data: []`.
+      const collected = collectArrayCandidates(val);
+      const collectedNonNull = collected.filter(x => x != null);
+
       results[k] = {
         count: arr.length,
-        first: arr.slice(0, 1)[0] ?? null,
+        nonNullCount: nonNull.length,
+        first: nonNull.slice(0, 1)[0] ?? null,
+        collectedCount: collected.length,
+        collectedNonNullCount: collectedNonNull.length,
+        collectedFirst: collectedNonNull.slice(0, 1)[0] ?? null,
       };
     }
 
-    return json({ siteId, results });
+    return json({ siteId, results, offlineInfraHostsSample, offlineNonConsoleHostsSample });
   }
 
   try {
@@ -209,29 +285,33 @@ serve(async (req) => {
     // API key supports, so we treat failures as non-fatal.
     let infraOfflineDevices: AnyObj[] = [];
     try {
-      const candidates = await Promise.allSettled([
+      const candidateResponses = await Promise.allSettled([
+        unifi(`/proxy/network/v2/api/site/default/device`),
+        unifi(`/proxy/network/v2/api/site/${siteId}/device`),
+
+        // Fallbacks (may return consoles only depending on API key)
         unifi(`/v1/sites/${siteId}/devices`),
         unifi(`/v1/sites/${siteId}/hosts`),
         unifi(`/v1/sites/${siteId}/clients`),
         unifi(`/v1/hosts?site_id=${siteId}`),
       ]);
 
-      const all: AnyObj[] = [];
-      for (const c of candidates) {
+      const allDevices: AnyObj[] = [];
+      for (const c of candidateResponses) {
         if (c.status !== 'fulfilled') continue;
-        const data = (c.value as AnyObj)?.data;
-        if (Array.isArray(data)) all.push(...data);
+        const val = c.value as AnyObj;
+        allDevices.push(...collectArrayCandidates(val));
       }
 
-      const offlineInfra = all
+      const offlineInfra = allDevices
         .filter(isProbablyInfraDevice)
         .filter(isProbablyOffline)
         .map((d: AnyObj) => ({
           name: pickDeviceName(d),
           ipAddress: pickDeviceIp(d),
           mac: pickDeviceMac(d),
-          type: d?.type,
-          state: d?.reportedState?.state ?? d?.state,
+          type: d?.type ?? d?.hardwareType ?? d?.deviceType,
+          state: d?.reportedState?.state ?? d?.state ?? d?.status,
         }));
 
       infraOfflineDevices = uniqByKey(

@@ -9,11 +9,24 @@ import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
 import { formatDistanceToNow } from 'date-fns';
 
+const READ_WARRANTY_KEY = 'momentia-read-warranty-alerts';
+
+function readWarrantySet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(READ_WARRANTY_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
 export function NotificationsPage() {
   const navigate = useNavigate();
-  const { alerts, loading, error, reload, markResolved } = useAlerts(false);
+  const { alerts, loading, error, reload, markResolved } = useAlerts();
   const { assets, loading: assetsLoading, error: assetsError, reload: reloadAssets } = useAllAssets();
   const { customers } = useCustomers();
+  const readWarranty = readWarrantySet();
 
   const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? '—';
   const warrantyAlerts = assets.flatMap(a => {
@@ -27,10 +40,48 @@ export function NotificationsPage() {
       warrantyEnd: a.warrantyEnd,
       severity: days < 0 ? 'high' as const : 'medium' as const,
       source: 'warranty',
+      timestamp: a.createdAt,
+      unread: !readWarranty.has(`warranty-${a.id}`),
     }];
   });
   const isLoading = loading || assetsLoading;
-  const totalUnread = alerts.length + warrantyAlerts.length;
+  const totalUnread = alerts.filter(a => !a.resolved).length + warrantyAlerts.filter(a => a.unread).length;
+
+  const items = [
+    ...alerts.map(alert => ({
+      kind: 'db' as const,
+      id: alert.id,
+      customerId: alert.customerId,
+      title: alert.title,
+      source: alert.source,
+      severity: alert.severity,
+      message: alert.message,
+      timestamp: alert.timestamp,
+      unread: !alert.resolved,
+    })),
+    ...warrantyAlerts.map(alert => ({
+      kind: 'warranty' as const,
+      id: alert.id,
+      customerId: alert.customerId,
+      title: alert.title,
+      source: alert.source,
+      severity: alert.severity,
+      message: `Warranty date: ${alert.warrantyEnd}`,
+      timestamp: alert.timestamp,
+      unread: alert.unread,
+    })),
+  ].sort((a, b) => {
+    if (a.unread !== b.unread) return a.unread ? -1 : 1;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+
+  function markWarrantyRead(id: string) {
+    const next = readWarrantySet();
+    next.add(id);
+    localStorage.setItem(READ_WARRANTY_KEY, JSON.stringify([...next]));
+    // refresh local list
+    reloadAssets();
+  }
 
   return (
     <div className="space-y-4">
@@ -68,55 +119,50 @@ export function NotificationsPage() {
           </Card>
         )}
 
-        {!isLoading && alerts.map(alert => (
-          <Card key={alert.id} className="hover:shadow-card-hover">
+        {!isLoading && items.map(item => (
+          <Card key={`${item.kind}-${item.id}`} className="hover:shadow-card-hover">
             <CardBody className="pt-4 flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <Badge variant={alert.severity} dot>{alert.severity.toUpperCase()}</Badge>
-                  <span className="text-xs text-text-muted">{customerName(alert.customerId)}</span>
-                  <span className="text-xs text-text-muted">· {alert.source}</span>
+                  <Badge variant={item.severity} dot>{item.severity.toUpperCase()}</Badge>
+                  <span className="text-xs text-text-muted">{customerName(item.customerId)}</span>
+                  <span className="text-xs text-text-muted">· {item.source}</span>
+                  {!item.unread && <Badge variant="default">Read</Badge>}
                 </div>
-                <p className="text-sm font-semibold text-text-primary">{alert.title}</p>
-                <p className="text-sm text-text-secondary mt-0.5">{alert.message}</p>
-                <p className="text-xs text-text-muted mt-1">
-                  {formatDistanceToNow(new Date(alert.timestamp), { addSuffix: true })}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => markResolved(alert.id)}
-              >
-                Resolve
-              </Button>
-            </CardBody>
-          </Card>
-        ))}
-
-        {!isLoading && warrantyAlerts.map(alert => (
-          <Card key={alert.id} className="hover:shadow-card-hover">
-            <CardBody className="pt-4 flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <Badge variant={alert.severity} dot>{alert.severity.toUpperCase()}</Badge>
-                  <span className="text-xs text-text-muted">{customerName(alert.customerId)}</span>
-                  <span className="text-xs text-text-muted">· {alert.source}</span>
-                </div>
-                <p className="text-sm font-semibold text-text-primary">{alert.title}</p>
+                <p className="text-sm font-semibold text-text-primary">{item.title}</p>
                 <p className="text-sm text-text-secondary mt-0.5">
-                  <ShieldAlert className="size-3.5 inline mr-1" />
-                  Warranty date: {alert.warrantyEnd}
+                  {item.kind === 'warranty' && <ShieldAlert className="size-3.5 inline mr-1" />}
+                  {item.message}
+                </p>
+                <p className="text-xs text-text-muted mt-1">
+                  {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/customers/${alert.customerId}?tab=assets`)}
-                rightIcon={<ExternalLink className="size-3" />}
-              >
-                Open
-              </Button>
+              <div className="flex items-center gap-2">
+                {item.kind === 'warranty' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/customers/${item.customerId}?tab=assets`)}
+                    rightIcon={<ExternalLink className="size-3" />}
+                  >
+                    Open
+                  </Button>
+                )}
+                {item.unread && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (item.kind === 'db') await markResolved(item.id);
+                      else markWarrantyRead(item.id);
+                      window.dispatchEvent(new Event('notifications-updated'));
+                    }}
+                  >
+                    Mark read
+                  </Button>
+                )}
+              </div>
             </CardBody>
           </Card>
         ))}

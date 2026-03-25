@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, HeadphonesIcon, ScrollText,
@@ -9,6 +10,19 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAlerts } from '../../hooks/useAlerts';
 import { useAllAssets } from '../../hooks/useAssets';
+
+const READ_WARRANTY_KEY = 'momentia-read-warranty-alerts';
+
+function readWarrantySet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(READ_WARRANTY_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
 
 interface NavItem {
   label:    string;
@@ -76,8 +90,8 @@ interface SidebarProps {
 export function Sidebar({ mobile }: SidebarProps) {
   const { setSidebarOpen } = useApp();
   const { profile }        = useAuth();
-  const { alerts }         = useAlerts(false);
-  const { assets }         = useAllAssets();
+  const { alerts, reload: reloadAlerts } = useAlerts(false);
+  const { assets, reload: reloadAssets } = useAllAssets();
   const canViewUsers  = profile?.role === 'superadmin' || profile?.role === 'admin';
   const topNavItems = topNav.map(item =>
     item.to === '/customers' && profile?.role === 'viewer'
@@ -89,10 +103,20 @@ export function Sidebar({ mobile }: SidebarProps) {
     if (mobile) setSidebarOpen(false);
   };
 
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      void reloadAlerts();
+      void reloadAssets();
+    };
+    window.addEventListener('notifications-updated', onNotificationsUpdated);
+    return () => window.removeEventListener('notifications-updated', onNotificationsUpdated);
+  }, [reloadAlerts, reloadAssets]);
+
+  const readWarranty = readWarrantySet();
   const warrantyCount = assets.filter(a => {
     if (!a.warrantyEnd) return false;
     const days = Math.floor((new Date(a.warrantyEnd).getTime() - Date.now()) / 86_400_000);
-    return days < 90;
+    return days < 90 && !readWarranty.has(`warranty-${a.id}`);
   }).length;
   const notificationCount = alerts.length + warrantyCount;
   const bottomNavItems = bottomNav.map(item =>

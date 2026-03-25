@@ -9,13 +9,30 @@ import { CountBadge } from '../ui/Badge';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAlerts } from '../../hooks/useAlerts';
+import { useAllAssets } from '../../hooks/useAssets';
+
+const READ_WARRANTY_KEY = 'momentia-read-warranty-alerts';
+
+function readWarrantySet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(READ_WARRANTY_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
 
 const DATE_RANGES = ['Today', 'Last 7 days', 'Last 30 days', 'This month', 'Custom…'];
 
 export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: boolean }) {
   const { theme, toggleTheme }         = useTheme();
-  const { toggleSidebar, notificationCount } = useApp();
+  const { toggleSidebar } = useApp();
   const { profile, signOut }           = useAuth();
+  const { alerts, reload: reloadAlerts } = useAlerts(false);
+  const { assets, reload: reloadAssets } = useAllAssets();
   const navigate = useNavigate();
 
   const [searchVal, setSearchVal]       = useState('');
@@ -36,6 +53,15 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
     return () => document.removeEventListener('mousedown', onOutside);
   }, []);
 
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      void reloadAlerts();
+      void reloadAssets();
+    };
+    window.addEventListener('notifications-updated', onNotificationsUpdated);
+    return () => window.removeEventListener('notifications-updated', onNotificationsUpdated);
+  }, [reloadAlerts, reloadAssets]);
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (searchVal.trim()) navigate(`/customers?q=${encodeURIComponent(searchVal.trim())}`);
@@ -53,6 +79,14 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
   }
 
   const displayName = profile?.name ?? profile?.email ?? 'User';
+  const readWarranty = readWarrantySet();
+  const warrantyUnread = assets.filter(a => {
+    if (!a.warrantyEnd) return false;
+    const days = Math.floor((new Date(a.warrantyEnd).getTime() - Date.now()) / 86_400_000);
+    if (days >= 90) return false;
+    return !readWarranty.has(`warranty-${a.id}`);
+  }).length;
+  const notificationCount = alerts.length + warrantyUnread;
 
   return (
     <header

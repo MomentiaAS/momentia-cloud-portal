@@ -240,8 +240,14 @@ export function NotificationsPage() {
           </Card>
         )}
 
-        {!isLoading && displayedItems.map(item => (
-          <Card key={`${item.kind}-${item.id}`} className="hover:shadow-card-hover">
+        {!isLoading && displayedItems.map(item => {
+          const isUniFiOffline = item.kind === 'db' && item.source.startsWith('unifi-offline-');
+          return (
+          <Card
+            key={`${item.kind}-${item.id}`}
+            className="hover:shadow-card-hover"
+            onClick={isUniFiOffline ? () => navigate(`/customers/${item.customerId}?tab=network`) : undefined}
+          >
             <CardBody className="pt-4 flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -260,21 +266,14 @@ export function NotificationsPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {item.kind === 'db' && item.source.startsWith('unifi-offline-') && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/customers/${item.customerId}?tab=network&unifiAlert=${encodeURIComponent(item.source)}`)}
-                    rightIcon={<ExternalLink className="size-3" />}
-                  >
-                    Open
-                  </Button>
-                )}
                 {item.kind === 'warranty' && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/customers/${item.customerId}?tab=assets`)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/customers/${item.customerId}?tab=assets`);
+                    }}
                     rightIcon={<ExternalLink className="size-3" />}
                   >
                     Open
@@ -284,7 +283,8 @@ export function NotificationsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       if (item.kind === 'db') await markResolved(item.id);
                       else markWarrantyRead(item.id);
                       window.dispatchEvent(new Event('notifications-updated'));
@@ -296,7 +296,7 @@ export function NotificationsPage() {
               </div>
             </CardBody>
           </Card>
-        ))}
+        );})}
       </div>
     </div>
   );

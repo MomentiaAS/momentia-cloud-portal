@@ -167,16 +167,16 @@ serve(async (req) => {
   // Debug: return raw first objects from each endpoint
   if (debug) {
     const reqs: Array<{ key: string; promise: Promise<unknown> }> = [
-      { key: 'sites', promise: unifi('/v1/sites') },
-      { key: 'hosts', promise: unifi('/v1/hosts') },
+      { key: 'sites', promise: unifiProxy('/v1/sites') },
+      { key: 'hosts', promise: unifiProxy('/v1/hosts') },
     ];
 
     if (siteId) {
       reqs.push(
-        { key: 'site_devices_v1', promise: unifi(`/v1/sites/${siteId}/devices`) },
-        { key: 'site_hosts_v1', promise: unifi(`/v1/sites/${siteId}/hosts`) },
-        { key: 'site_clients_v1', promise: unifi(`/v1/sites/${siteId}/clients`) },
-        { key: 'hosts_site_id', promise: unifi(`/v1/hosts?site_id=${siteId}`) },
+        { key: 'site_devices_v1', promise: unifiProxy(`/v1/sites/${siteId}/devices`) },
+        { key: 'site_hosts_v1', promise: unifiProxy(`/v1/sites/${siteId}/hosts`) },
+        { key: 'site_clients_v1', promise: unifiProxy(`/v1/sites/${siteId}/clients`) },
+        { key: 'hosts_site_id', promise: unifiProxy(`/v1/hosts?site_id=${siteId}`) },
         // UniFi cloud sometimes exposes device lists via v2 proxy endpoints.
         // These endpoints typically return offline/online device records with
         // name + ip-ish fields depending on the key and UniFi version.
@@ -272,8 +272,8 @@ serve(async (req) => {
   try {
     // Always fetch both endpoints — we need hosts for device names
     const [sitesRes, hostsRes] = await Promise.allSettled([
-      unifi('/v1/sites'),
-      unifi('/v1/hosts'),
+      unifiProxy('/v1/sites'),
+      unifiProxy('/v1/hosts'),
     ]);
 
     const rawSites: AnyObj[] = sitesRes.status === 'fulfilled' ? (sitesRes.value?.data ?? []) : [];
@@ -320,10 +320,10 @@ serve(async (req) => {
         unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`),
 
         // Fallbacks (may return consoles only depending on API key)
-        unifi(`/v1/sites/${siteId}/devices`),
-        unifi(`/v1/sites/${siteId}/hosts`),
-        unifi(`/v1/sites/${siteId}/clients`),
-        unifi(`/v1/hosts?site_id=${siteId}`),
+        unifiProxy(`/v1/sites/${siteId}/devices`),
+        unifiProxy(`/v1/sites/${siteId}/hosts`),
+        unifiProxy(`/v1/sites/${siteId}/clients`),
+        unifiProxy(`/v1/hosts?site_id=${siteId}`),
       ]);
 
       const allDevices: AnyObj[] = [];
@@ -362,8 +362,8 @@ serve(async (req) => {
         unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`),
         unifiProxy(`/proxy/network/v2/api/site/default/device`),
         unifiProxy(`/proxy/network/v2/api/site/${siteId}/device`),
-        unifi(`/v1/sites/${siteId}/devices`),
-        unifi(`/v1/sites/${siteId}/hosts`),
+          unifiProxy(`/v1/sites/${siteId}/devices`),
+          unifiProxy(`/v1/sites/${siteId}/hosts`),
       ]);
 
       for (const c of deviceResponses) {
@@ -376,7 +376,7 @@ serve(async (req) => {
       const clientResponses = await Promise.allSettled([
         unifiProxy(`/proxy/network/api/s/default/stat/client`),
         unifiProxy(`/proxy/network/api/s/${siteId}/stat/client`),
-        unifi(`/v1/sites/${siteId}/clients`),
+          unifiProxy(`/v1/sites/${siteId}/clients`),
       ]);
 
       for (const c of clientResponses) {

@@ -121,13 +121,15 @@ export function useUnifiStatus(siteId: string | undefined) {
       setAccessToken(data.session?.access_token ?? null);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setAccessToken(session?.access_token ?? null);
     });
 
     return () => {
       mounted = false;
-      subscription?.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -172,13 +174,15 @@ export function useUnifiSites() {
       setAccessToken(data.session?.access_token ?? null);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setAccessToken(session?.access_token ?? null);
     });
 
     return () => {
       mounted = false;
-      subscription?.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 

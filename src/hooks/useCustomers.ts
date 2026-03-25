@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchCustomers, insertCustomer, updateCustomer, deleteCustomer } from '../lib/db';
 import type { Customer } from '../types';
+import { supabase } from '../lib/supabase';
 
 export interface CustomerFormPayload {
   name:               string;
@@ -83,6 +84,31 @@ export function useCustomers() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Keep the customers list "live" when Network tab updates `customers.health`
+  // (e.g. during UniFi offline/health recalculation).
+  useEffect(() => {
+    const channel = supabase
+      .channel('customers-health-updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'customers' },
+        (payload) => {
+          const row = payload.new as Partial<Customer> & { id?: string; health?: unknown };
+          const id = row?.id;
+          if (!id) return;
+
+          // Only patch what we need for the Customers view.
+          const health = row.health;
+          if (health == null) return;
+
+          setCustomers(prev => prev.map(c => (c.id === id ? { ...c, health: health as Customer['health'] } : c)));
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   async function addCustomer(data: CustomerFormPayload): Promise<void> {
     const created = await insertCustomer(payloadToDb(data));

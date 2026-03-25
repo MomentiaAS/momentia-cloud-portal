@@ -108,13 +108,39 @@ function collectArrayCandidates(payload: AnyObj): AnyObj[] {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
 
+  // Some UniFi proxy endpoints return arrays nested inside objects
+  // (e.g. `data: { devices: [...] }` or similar). We need to scan more deeply
+  // than just `payload.data` and top-level properties.
   const out: AnyObj[] = [];
-  const maybeData = (payload as AnyObj).data;
-  if (Array.isArray(maybeData)) out.push(...maybeData);
+  const seenArrays = new Set<any[]>();
 
-  for (const [_, v] of Object.entries(payload)) {
-    if (Array.isArray(v)) out.push(...v);
-  }
+  const MAX_DEPTH = 6;
+  const MAX_ITEMS = 2000;
+
+  const walk = (node: unknown, depthLeft: number) => {
+    if (out.length >= MAX_ITEMS) return;
+    if (depthLeft < 0) return;
+    if (!node) return;
+
+    if (Array.isArray(node)) {
+      if (seenArrays.has(node)) return;
+      seenArrays.add(node);
+      for (const item of node) {
+        if (out.length >= MAX_ITEMS) break;
+        if (item != null) out.push(item as AnyObj);
+      }
+      return;
+    }
+
+    if (typeof node !== 'object') return;
+
+    for (const v of Object.values(node as AnyObj)) {
+      walk(v, depthLeft - 1);
+      if (out.length >= MAX_ITEMS) return;
+    }
+  };
+
+  walk(payload, MAX_DEPTH);
   return out;
 }
 

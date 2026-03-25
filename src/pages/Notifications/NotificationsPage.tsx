@@ -66,6 +66,12 @@ export function NotificationsPage() {
             if (fnErr || data?.error) return;
 
             const counts = data?.site?.statistics?.counts ?? {};
+            const gatewayName =
+              data?.host?.reportedState?.name ??
+              data?.host?.reportedState?.hostname ??
+              data?.host?.reportedState?.hardware?.shortname ??
+              data?.host?.reportedState?.hardware?.name ??
+              'UniFi Gateway';
             const offlineGateway = (counts.offlineGatewayDevice ?? 0) as number;
             const offlineWired   = (counts.offlineWiredDevice   ?? 0) as number;
             const offlineWifi    = (counts.offlineWifiDevice    ?? 0) as number;
@@ -78,7 +84,7 @@ export function NotificationsPage() {
                 source:     'unifi-offline-gateway',
                 severity:   'critical',
                 title:      'UniFi: Gateway offline',
-                message:    `Customer: ${customer.name}. UniFi gateway reports offline (offlineGatewayDevice: ${offlineGateway}). Site: ${customer.unifiSiteId}`,
+                message:    `Customer: ${customer.name}. UniFi gateway (${gatewayName}) reports offline (offlineGatewayDevice: ${offlineGateway}). Site: ${customer.unifiSiteId}`,
               });
             } else {
               await resolveUnifiOfflineAlerts({ customerId: customer.id, source: 'unifi-offline-gateway' });
@@ -90,7 +96,7 @@ export function NotificationsPage() {
                 source:     'unifi-offline-infra',
                 severity:   'medium',
                 title:      'UniFi: Infrastructure offline',
-                message:    `Customer: ${customer.name}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Site: ${customer.unifiSiteId}`,
+                message:    `Customer: ${customer.name}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Gateway: ${gatewayName}. Site: ${customer.unifiSiteId}`,
               });
             } else {
               await resolveUnifiOfflineAlerts({ customerId: customer.id, source: 'unifi-offline-infra' });
@@ -243,6 +249,16 @@ export function NotificationsPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {item.kind === 'db' && item.source.startsWith('unifi-offline-') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/customers/${item.customerId}?tab=network&unifiAlert=${encodeURIComponent(item.source)}`)}
+                    rightIcon={<ExternalLink className="size-3" />}
+                  >
+                    Open
+                  </Button>
+                )}
                 {item.kind === 'warranty' && (
                   <Button
                     variant="outline"

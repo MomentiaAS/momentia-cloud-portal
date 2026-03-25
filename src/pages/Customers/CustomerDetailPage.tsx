@@ -549,13 +549,20 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
 
     const syncAlerts = async () => {
       try {
+        const gatewayName =
+          status.host?.reportedState?.name ??
+          status.host?.reportedState?.hostname ??
+          status.host?.reportedState?.hardware?.shortname ??
+          status.host?.reportedState?.hardware?.name ??
+          'UniFi Gateway';
+
         if (gatewayOffline) {
           await upsertUnifiOfflineAlert({
             customerId,
             source:   'unifi-offline-gateway',
             severity: 'critical',
             title:    'UniFi: Gateway offline',
-            message:  `Customer: ${customerName}. UniFi gateway reports offline (offlineGatewayDevice: ${offlineGateway}). Site: ${siteId}`,
+            message:  `Customer: ${customerName}. UniFi gateway (${gatewayName}) reports offline (offlineGatewayDevice: ${offlineGateway}). Site: ${siteId}`,
           });
         } else {
           await resolveUnifiOfflineAlerts({ customerId, source: 'unifi-offline-gateway' });
@@ -567,7 +574,7 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
             source:   'unifi-offline-infra',
             severity: 'medium',
             title:    'UniFi: Infrastructure offline',
-            message:  `Customer: ${customerName}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Site: ${siteId}`,
+            message:  `Customer: ${customerName}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Gateway: ${gatewayName}. Site: ${siteId}`,
           });
         } else {
           await resolveUnifiOfflineAlerts({ customerId, source: 'unifi-offline-infra' });

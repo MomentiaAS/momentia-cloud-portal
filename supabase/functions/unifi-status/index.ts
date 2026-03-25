@@ -43,9 +43,13 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function unifi(base: string, path: string) {
+async function unifi(base: string, path: string, extraHeaders?: Record<string, string>) {
   const res = await fetch(`${base}${path}`, {
-    headers: { 'X-API-KEY': UNIFI_API_KEY, 'Accept': 'application/json' },
+    headers: {
+      'X-API-KEY': UNIFI_API_KEY,
+      'Accept': 'application/json',
+      ...(extraHeaders ?? {}),
+    },
   });
   if (!res.ok) {
     const text = await res.text();
@@ -54,21 +58,42 @@ async function unifi(base: string, path: string) {
   return res.json();
 }
 
-async function unifiProxy(path: string) {
-  const bases = [getUnifiBase()];
+function getDirectHost() {
   const directBase = getUnifiDirectBase();
-  if (directBase) bases.push(directBase);
+  if (!directBase) return null;
+  try {
+    const u = new URL(directBase);
+    return u.host;
+  } catch {
+    return null;
+  }
+}
 
-  const errors: Array<{ base: string; message: string }> = [];
-  for (const base of bases) {
+async function unifiProxy(path: string) {
+  const base = getUnifiBase();
+  const directHost = getDirectHost();
+
+  const errors: Array<{ mode: string; message: string }> = [];
+
+  // 1) Normal call
+  try {
+    return await unifi(base, path);
+  } catch (e) {
+    errors.push({ mode: 'base', message: e instanceof Error ? e.message : String(e) });
+  }
+
+  // 2) If configured, try same base but with Host header overridden.
+  // This avoids DNS issues when the `*.id.ui.direct` host isn't resolvable
+  // from the Edge runtime.
+  if (directHost) {
     try {
-      return await unifi(base, path);
+      return await unifi(base, path, { Host: directHost });
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      errors.push({ base, message });
+      errors.push({ mode: `host=${directHost}`, message: e instanceof Error ? e.message : String(e) });
     }
   }
-  throw new Error(errors.map(e => `${e.base} -> ${e.message}`).join(' | '));
+
+  throw new Error(errors.map(e => `${e.mode} -> ${e.message}`).join(' | '));
 }
 
 // deno-lint-ignore no-explicit-any
@@ -104,6 +129,15 @@ function pickDeviceMac(d: AnyObj): string | undefined {
     d?.reportedState?.hardware?.macAddress ??
     undefined
   );
+}
+
+function getHostSiteId(d: AnyObj): string | null {
+  return d?.siteId ?? d?.site_id ?? d?.site ?? null;
+}
+
+function isProbablyClientHost(d: AnyObj): boolean {
+  const type = String(d?.type ?? d?.deviceType ?? '').toLowerCase();
+  return type.includes('client');
 }
 
 function isProbablyOffline(d: AnyObj): boolean {
@@ -233,6 +267,17 @@ serve(async (req) => {
         { key: 'proxy_api_s_siteId_stat_device', promise: unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`) },
         { key: 'proxy_api_s_default_stat_client', promise: unifiProxy(`/proxy/network/api/s/default/stat/client`) },
         { key: 'proxy_api_s_siteId_stat_client', promise: unifiProxy(`/proxy/network/api/s/${siteId}/stat/client`) },
+
+        // Additional inventory variants that may be accessible on api.ui.com.
+        { key: 'proxy_v2_site_siteId_clients', promise: unifiProxy(`/proxy/network/v2/api/site/${siteId}/clients`) },
+        { key: 'proxy_v2_site_siteId_client',  promise: unifiProxy(`/proxy/network/v2/api/site/${siteId}/client`) },
+        { key: 'proxy_v2_site_default_clients', promise: unifiProxy(`/proxy/network/v2/api/site/default/clients`) },
+        { key: 'proxy_v2_site_default_client',  promise: unifiProxy(`/proxy/network/v2/api/site/default/client`) },
+
+        // v1 hosts with query-based type filtering (best-effort; may be ignored by UniFi).
+        { key: 'hosts_siteid_type_client', promise: unifiProxy(`/v1/hosts?site_id=${siteId}&type=client`) },
+        { key: 'hosts_siteid_type_wifi',   promise: unifiProxy(`/v1/hosts?site_id=${siteId}&type=wifi`) },
+        { key: 'hosts_siteid_type_wired',  promise: unifiProxy(`/v1/hosts?site_id=${siteId}&type=wired`) },
       );
     }
 
@@ -244,11 +289,20 @@ serve(async (req) => {
     const hostsSettledIndex = reqs.findIndex(r => r.key === 'hosts');
     let offlineInfraHostsSample: AnyObj[] = [];
     let offlineNonConsoleHostsSample: AnyObj[] = [];
+    let hostsSiteIdSample: AnyObj[] = [];
     if (hostsSettledIndex >= 0) {
       const hostRes = settled[hostsSettledIndex];
       if (hostRes.status === 'fulfilled') {
         const hostsData = (hostRes.value as AnyObj)?.data;
         const arr = Array.isArray(hostsData) ? hostsData : [];
+
+        hostsSiteIdSample = arr.slice(0, 25).map((d: AnyObj) => ({
+          id: d?.id ?? null,
+          type: d?.type ?? d?.deviceType ?? null,
+          name: pickDeviceName(d),
+          siteId: getHostSiteId(d),
+          state: d?.reportedState?.state ?? d?.state ?? d?.status ?? null,
+        }));
 
         const offlineHosts = arr.filter(isProbablyOffline).slice(0, 20);
         const offlineNonConsole = offlineHosts.filter(d => {
@@ -314,6 +368,7 @@ serve(async (req) => {
       results,
       offlineInfraHostsSample,
       offlineNonConsoleHostsSample,
+      hostsSiteIdSample,
       debugEnv: {
         unifiBase: getUnifiBase(),
         unifiApiKeySet: !!UNIFI_API_KEY,
@@ -416,6 +471,8 @@ serve(async (req) => {
     }
 
     // Best-effort device/client inventory for UI drawers.
+    // Primary source: proxy/network api stat endpoints (may be unavailable from
+    // Edge due to DNS restrictions, hence the fallback to /v1/hosts below).
     let devicesRaw: AnyObj[] = [];
     let clientsRaw: AnyObj[] = [];
 
@@ -425,8 +482,8 @@ serve(async (req) => {
         unifiProxy(`/proxy/network/api/s/${siteId}/stat/device`),
         unifiProxy(`/proxy/network/v2/api/site/default/device`),
         unifiProxy(`/proxy/network/v2/api/site/${siteId}/device`),
-          unifiProxy(`/v1/sites/${siteId}/devices`),
-          unifiProxy(`/v1/sites/${siteId}/hosts`),
+        unifiProxy(`/v1/sites/${siteId}/devices`),
+        unifiProxy(`/v1/sites/${siteId}/hosts`),
       ]);
 
       for (const c of deviceResponses) {
@@ -439,7 +496,15 @@ serve(async (req) => {
       const clientResponses = await Promise.allSettled([
         unifiProxy(`/proxy/network/api/s/default/stat/client`),
         unifiProxy(`/proxy/network/api/s/${siteId}/stat/client`),
-          unifiProxy(`/v1/sites/${siteId}/clients`),
+        unifiProxy(`/v1/sites/${siteId}/clients`),
+        // Extra variants (api.ui.com only, best-effort)
+        unifiProxy(`/proxy/network/v2/api/site/${siteId}/clients`),
+        unifiProxy(`/proxy/network/v2/api/site/${siteId}/client`),
+        unifiProxy(`/proxy/network/v2/api/site/default/clients`),
+        unifiProxy(`/proxy/network/v2/api/site/default/client`),
+        unifiProxy(`/v1/hosts?site_id=${siteId}&type=client`),
+        unifiProxy(`/v1/hosts?site_id=${siteId}&type=wifi`),
+        unifiProxy(`/v1/hosts?site_id=${siteId}&type=wired`),
       ]);
 
       for (const c of clientResponses) {
@@ -448,8 +513,22 @@ serve(async (req) => {
       }
     } catch { /* non-fatal */ }
 
+    // Fallback: derive devices/clients from /v1/hosts which is already fetched
+    // successfully to build `hostById`.
+    if (devicesRaw.length === 0 || clientsRaw.length === 0) {
+      const siteHosts = rawHosts.filter(h => String(getHostSiteId(h)) === String(siteId));
+      const hostsForInventory = siteHosts.length > 0 ? siteHosts : rawHosts;
+
+      if (devicesRaw.length === 0) {
+        devicesRaw = hostsForInventory.filter(h => !isProbablyClientHost(h));
+      }
+      if (clientsRaw.length === 0) {
+        clientsRaw = hostsForInventory.filter(h => isProbablyClientHost(h));
+      }
+    }
+
     const devices = uniqByKey(
-      devicesRaw,
+      devicesRaw.filter((d: AnyObj) => !isProbablyClientHost(d)),
       (d: AnyObj) => `${pickDeviceMac(d) ?? ''}|${pickDeviceIp(d) ?? ''}|${pickDeviceName(d) ?? ''}`,
     ).map((d: AnyObj) => ({
       name: pickDeviceName(d),
@@ -460,7 +539,7 @@ serve(async (req) => {
     })).slice(0, 200);
 
     const clients = uniqByKey(
-      clientsRaw,
+      clientsRaw.filter((d: AnyObj) => isProbablyClientHost(d)),
       (d: AnyObj) => `${pickDeviceMac(d) ?? ''}|${pickDeviceIp(d) ?? ''}|${pickDeviceName(d) ?? ''}`,
     ).map((d: AnyObj) => ({
       name: pickDeviceName(d),

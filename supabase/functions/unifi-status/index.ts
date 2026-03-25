@@ -44,15 +44,16 @@ async function unifiProxy(path: string) {
   const bases = [UNIFI_BASE];
   if (UNIFI_DIRECT_BASE) bases.push(UNIFI_DIRECT_BASE);
 
-  let lastErr: unknown = null;
+  const errors: Array<{ base: string; message: string }> = [];
   for (const base of bases) {
     try {
       return await unifi(base, path);
     } catch (e) {
-      lastErr = e;
+      const message = e instanceof Error ? e.message : String(e);
+      errors.push({ base, message });
     }
   }
-  throw lastErr;
+  throw new Error(errors.map(e => `${e.base} -> ${e.message}`).join(' | '));
 }
 
 // deno-lint-ignore no-explicit-any
@@ -115,7 +116,7 @@ function collectArrayCandidates(payload: AnyObj): AnyObj[] {
   const seenArrays = new Set<any[]>();
 
   // These endpoints can be deeply nested; keep bounds to avoid runaway scans.
-  const MAX_DEPTH = 12;
+  const MAX_DEPTH = 20;
   const MAX_ITEMS = 8000;
 
   const walk = (node: unknown, depthLeft: number) => {

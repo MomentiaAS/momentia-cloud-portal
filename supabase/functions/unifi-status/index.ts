@@ -114,8 +114,9 @@ function collectArrayCandidates(payload: AnyObj): AnyObj[] {
   const out: AnyObj[] = [];
   const seenArrays = new Set<any[]>();
 
-  const MAX_DEPTH = 6;
-  const MAX_ITEMS = 2000;
+  // These endpoints can be deeply nested; keep bounds to avoid runaway scans.
+  const MAX_DEPTH = 12;
+  const MAX_ITEMS = 8000;
 
   const walk = (node: unknown, depthLeft: number) => {
     if (out.length >= MAX_ITEMS) return;

@@ -19,7 +19,7 @@ import { useCustomerDetail } from '../../hooks/useCustomerDetail';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useUnifiStatus } from '../../hooks/useUnifiStatus';
 import { useCustomerAssets } from '../../hooks/useAssets';
-import { updateCustomer } from '../../lib/db';
+import { updateCustomer, upsertUnifiOfflineAlert, resolveUnifiOfflineAlerts } from '../../lib/db';
 import { CustomerForm } from './CustomerForm';
 import { AssetForm } from '../Assets/AssetForm';
 import { DocumentationTab } from './DocumentationTab';
@@ -511,12 +511,16 @@ function computeUnifiHealth(status: import('../../hooks/useUnifiStatus').UnifiSt
   return 'healthy';
 }
 
-function NetworkTab({ siteId, customerId, onHealthChange }: {
+const WRITER_ROLES_NET = new Set(['superadmin', 'admin', 'technician']);
+
+function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
   siteId?: string;
   customerId: string;
+  customerName: string;
   onHealthChange?: (h: HealthStatus) => void;
 }) {
   const { status, loading, error, reload } = useUnifiStatus(siteId);
+  const { profile } = useAuth();
 
   // After the first successful fetch, compute health and persist it.
   const savedRef = useRef(false);
@@ -528,6 +532,55 @@ function NetworkTab({ siteId, customerId, onHealthChange }: {
     // Fire-and-forget — we don't surface errors here to avoid noisy UI
     updateCustomer(customerId, { health }).catch(console.error);
   }, [status, customerId, onHealthChange]);
+
+  // Sync UniFi offline alerts for this customer when data arrives (once per open).
+  const alertSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!status || alertSyncedRef.current) return;
+    if (!profile || !WRITER_ROLES_NET.has(profile.role)) return;
+    alertSyncedRef.current = true;
+
+    const counts         = status.site?.statistics?.counts ?? {};
+    const offlineGateway = (counts.offlineGatewayDevice ?? 0) as number;
+    const offlineWired   = (counts.offlineWiredDevice   ?? 0) as number;
+    const offlineWifi    = (counts.offlineWifiDevice    ?? 0) as number;
+    const gatewayOffline = offlineGateway > 0;
+    const infraOffline   = (offlineWired + offlineWifi) > 0;
+
+    const syncAlerts = async () => {
+      try {
+        if (gatewayOffline) {
+          await upsertUnifiOfflineAlert({
+            customerId,
+            source:   'unifi-offline-gateway',
+            severity: 'critical',
+            title:    'UniFi: Gateway offline',
+            message:  `Customer: ${customerName}. UniFi gateway reports offline (offlineGatewayDevice: ${offlineGateway}). Site: ${siteId}`,
+          });
+        } else {
+          await resolveUnifiOfflineAlerts({ customerId, source: 'unifi-offline-gateway' });
+        }
+
+        if (infraOffline) {
+          await upsertUnifiOfflineAlert({
+            customerId,
+            source:   'unifi-offline-infra',
+            severity: 'medium',
+            title:    'UniFi: Infrastructure offline',
+            message:  `Customer: ${customerName}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Site: ${siteId}`,
+          });
+        } else {
+          await resolveUnifiOfflineAlerts({ customerId, source: 'unifi-offline-infra' });
+        }
+
+        window.dispatchEvent(new Event('notifications-updated'));
+      } catch {
+        // Don't surface alert-sync errors in the Network tab UI
+      }
+    };
+
+    syncAlerts();
+  }, [status, customerId, customerName, siteId, profile]);
 
   if (!siteId) {
     return (
@@ -925,6 +978,7 @@ export function CustomerDetailPage() {
             <NetworkTab
               siteId={c.unifiSiteId}
               customerId={c.id}
+              customerName={c.name}
               onHealthChange={setHealthOverride}
             />
           )}

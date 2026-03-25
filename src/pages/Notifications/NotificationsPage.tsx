@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, RefreshCw, ShieldAlert, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
@@ -8,9 +8,15 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { useAlerts } from '../../hooks/useAlerts';
 import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { upsertUnifiOfflineAlert, resolveUnifiOfflineAlerts } from '../../lib/db';
 import { formatDistanceToNow } from 'date-fns';
 
-const READ_WARRANTY_KEY = 'momentia-read-warranty-alerts';
+const READ_WARRANTY_KEY  = 'momentia-read-warranty-alerts';
+const SYNC_THROTTLE_KEY  = 'momentia-unifi-sync-last';
+const SYNC_THROTTLE_MS   = 60_000; // 60 seconds between syncs
+const WRITER_ROLES = new Set(['superadmin', 'admin', 'technician']);
 
 function readWarrantySet(): Set<string> {
   try {
@@ -24,11 +30,93 @@ function readWarrantySet(): Set<string> {
 
 export function NotificationsPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { alerts, loading, error, reload, markResolved } = useAlerts();
   const { assets, loading: assetsLoading, error: assetsError, reload: reloadAssets } = useAllAssets();
   const { customers } = useCustomers();
   const readWarranty = readWarrantySet();
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const syncRunningRef = useRef(false);
+
+  // ── UniFi offline alert sync ─────────────────────────────────────────────
+  const syncUniFiAlerts = useCallback(async (force = false) => {
+    // Only writer roles create/update alerts
+    if (!profile || !WRITER_ROLES.has(profile.role)) return;
+    // Throttle: skip if synced recently (unless forced)
+    if (!force) {
+      const last = parseInt(sessionStorage.getItem(SYNC_THROTTLE_KEY) ?? '0', 10);
+      if (Date.now() - last < SYNC_THROTTLE_MS) return;
+    }
+    // Guard against concurrent runs
+    if (syncRunningRef.current) return;
+    syncRunningRef.current = true;
+    setSyncing(true);
+
+    try {
+      const unifiCustomers = customers.filter(c => c.integrations.unifi && c.unifiSiteId);
+      await Promise.allSettled(
+        unifiCustomers.map(async (customer) => {
+          try {
+            const { data, error: fnErr } = await supabase.functions.invoke('unifi-status', {
+              body: { site_id: customer.unifiSiteId },
+            });
+            if (fnErr || data?.error) return;
+
+            const counts = data?.site?.statistics?.counts ?? {};
+            const offlineGateway = (counts.offlineGatewayDevice ?? 0) as number;
+            const offlineWired   = (counts.offlineWiredDevice   ?? 0) as number;
+            const offlineWifi    = (counts.offlineWifiDevice    ?? 0) as number;
+            const gatewayOffline = offlineGateway > 0;
+            const infraOffline   = (offlineWired + offlineWifi) > 0;
+
+            if (gatewayOffline) {
+              await upsertUnifiOfflineAlert({
+                customerId: customer.id,
+                source:     'unifi-offline-gateway',
+                severity:   'critical',
+                title:      'UniFi: Gateway offline',
+                message:    `Customer: ${customer.name}. UniFi gateway reports offline (offlineGatewayDevice: ${offlineGateway}). Site: ${customer.unifiSiteId}`,
+              });
+            } else {
+              await resolveUnifiOfflineAlerts({ customerId: customer.id, source: 'unifi-offline-gateway' });
+            }
+
+            if (infraOffline) {
+              await upsertUnifiOfflineAlert({
+                customerId: customer.id,
+                source:     'unifi-offline-infra',
+                severity:   'medium',
+                title:      'UniFi: Infrastructure offline',
+                message:    `Customer: ${customer.name}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Site: ${customer.unifiSiteId}`,
+              });
+            } else {
+              await resolveUnifiOfflineAlerts({ customerId: customer.id, source: 'unifi-offline-infra' });
+            }
+          } catch {
+            // Don't surface per-customer sync errors in UI
+          }
+        }),
+      );
+
+      sessionStorage.setItem(SYNC_THROTTLE_KEY, String(Date.now()));
+      await reload();
+      await reloadAssets();
+      window.dispatchEvent(new Event('notifications-updated'));
+    } finally {
+      syncRunningRef.current = false;
+      setSyncing(false);
+    }
+  }, [customers, profile, reload, reloadAssets]);
+
+  // Sync on page load (once customers are loaded)
+  useEffect(() => {
+    if (customers.length > 0) {
+      void syncUniFiAlerts();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers.length]);
+  // ── End UniFi offline alert sync ─────────────────────────────────────────
 
   const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? '—';
   const warrantyAlerts = assets.flatMap(a => {
@@ -106,11 +194,11 @@ export function NotificationsPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => { reload(); reloadAssets(); }}
+            onClick={() => { void syncUniFiAlerts(true); }}
             aria-label="Refresh"
-            disabled={isLoading}
+            disabled={isLoading || syncing}
           >
-            <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${(isLoading || syncing) ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>

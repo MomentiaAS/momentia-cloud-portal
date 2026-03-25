@@ -246,6 +246,73 @@ export async function resolveAlert(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ── UniFi offline alert upsert/resolve ───────────────────────────────────────
+
+export type UnifiOfflineSource = 'unifi-offline-gateway' | 'unifi-offline-infra';
+
+/**
+ * Creates or updates (dedupes) a single unresolved UniFi offline alert
+ * for a given customer + source category. If an unresolved alert already
+ * exists it is updated in-place (keeping the original timestamp so "first seen"
+ * is preserved). Otherwise a new row is inserted.
+ */
+export async function upsertUnifiOfflineAlert(args: {
+  customerId: string;
+  source: UnifiOfflineSource;
+  title: string;
+  message: string;
+  severity: Alert['severity'];
+}): Promise<void> {
+  // Find existing unresolved alert for this customer + source
+  const { data: existing, error: selErr } = await supabase
+    .from('alerts')
+    .select('id')
+    .eq('customer_id', args.customerId)
+    .eq('resolved', false)
+    .eq('source', args.source)
+    .order('timestamp', { ascending: false })
+    .limit(1);
+
+  if (selErr) throw new Error(selErr.message);
+
+  const existingId = existing?.[0]?.id as string | undefined;
+
+  if (existingId) {
+    const { error } = await supabase
+      .from('alerts')
+      .update({ title: args.title, message: args.message, severity: args.severity })
+      .eq('id', existingId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from('alerts').insert({
+      customer_id: args.customerId,
+      title:       args.title,
+      message:     args.message,
+      severity:    args.severity,
+      source:      args.source,
+      resolved:    false,
+    });
+    if (error) throw new Error(error.message);
+  }
+}
+
+/**
+ * Resolves all unresolved UniFi offline alerts for a customer + source
+ * (called when the condition goes back to normal).
+ */
+export async function resolveUnifiOfflineAlerts(args: {
+  customerId: string;
+  source: UnifiOfflineSource;
+}): Promise<void> {
+  const { error } = await supabase
+    .from('alerts')
+    .update({ resolved: true })
+    .eq('customer_id', args.customerId)
+    .eq('resolved', false)
+    .eq('source', args.source);
+  if (error) throw new Error(error.message);
+}
+
 // ── Logs ──────────────────────────────────────────────────────────────────────
 
 export async function fetchLogsByCustomer(customerId: string): Promise<LogEntry[]> {

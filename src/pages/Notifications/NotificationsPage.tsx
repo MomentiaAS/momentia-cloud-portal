@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bell, RefreshCw, ShieldAlert, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
@@ -27,6 +28,7 @@ export function NotificationsPage() {
   const { assets, loading: assetsLoading, error: assetsError, reload: reloadAssets } = useAllAssets();
   const { customers } = useCustomers();
   const readWarranty = readWarrantySet();
+  const [unreadOnly, setUnreadOnly] = useState(false);
 
   const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? '—';
   const warrantyAlerts = assets.flatMap(a => {
@@ -75,6 +77,8 @@ export function NotificationsPage() {
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
+  const displayedItems = unreadOnly ? items.filter(i => i.unread) : items;
+
   function markWarrantyRead(id: string) {
     const next = readWarrantySet();
     next.add(id);
@@ -90,15 +94,25 @@ export function NotificationsPage() {
           <h1 className="text-2xl font-bold text-text-primary">Notifications</h1>
           {!isLoading && <Badge variant="danger">{totalUnread} unread</Badge>}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => { reload(); reloadAssets(); }}
-          aria-label="Refresh"
-          disabled={isLoading}
-        >
-          <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={unreadOnly ? 'primary' : 'outline'}
+            size="sm"
+            onClick={() => setUnreadOnly(v => !v)}
+            disabled={isLoading}
+          >
+            {unreadOnly ? 'Unread only' : 'All'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { reload(); reloadAssets(); }}
+            aria-label="Refresh"
+            disabled={isLoading}
+          >
+            <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {(error || assetsError) && (
@@ -110,16 +124,18 @@ export function NotificationsPage() {
       <div className="space-y-2">
         {isLoading && [1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-card" />)}
 
-        {!isLoading && totalUnread === 0 && (
+        {!isLoading && displayedItems.length === 0 && (
           <Card>
             <CardBody className="flex flex-col items-center gap-3 py-12 text-center">
               <Bell className="size-8 text-text-muted" />
-              <p className="text-sm text-text-muted">All caught up — no unresolved alerts.</p>
+              <p className="text-sm text-text-muted">
+                {unreadOnly ? 'No unread notifications.' : 'All caught up — no unresolved alerts.'}
+              </p>
             </CardBody>
           </Card>
         )}
 
-        {!isLoading && items.map(item => (
+        {!isLoading && displayedItems.map(item => (
           <Card key={`${item.kind}-${item.id}`} className="hover:shadow-card-hover">
             <CardBody className="pt-4 flex items-start gap-3">
               <div className="flex-1 min-w-0">

@@ -110,19 +110,35 @@ export function useUnifiStatus(siteId: string | undefined) {
   const [status,  setStatus]  = useState<UnifiStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  // Keep access token in sync so we don't call the protected edge function before auth is ready.
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setAccessToken(data.session?.access_token ?? null);
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccessToken(session?.access_token ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.subscription.unsubscribe();
+    };
+  }, []);
 
   const load = useCallback(async () => {
-    if (!siteId) return;
+    if (!siteId || !accessToken) return;
     setLoading(true);
     setError(null);
     try {
-      // Edge Functions are protected: pass the current user's JWT explicitly.
-      // This avoids race conditions where the supabase-js session isn't ready yet.
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
       const { data, error: fnErr } = await supabase.functions.invoke('unifi-status', {
         body: { site_id: siteId },
-        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (fnErr) throw new Error(fnErr.message);
       if (data?.error) throw new Error(data.error);
@@ -132,9 +148,11 @@ export function useUnifiStatus(siteId: string | undefined) {
     } finally {
       setLoading(false);
     }
-  }, [siteId]);
+  }, [siteId, accessToken]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return { status, loading, error, reload: load };
 }
@@ -145,16 +163,33 @@ export function useUnifiSites() {
   const [sites,   setSites]   = useState<UnifiSiteListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setAccessToken(data.session?.access_token ?? null);
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccessToken(session?.access_token ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.subscription.unsubscribe();
+    };
+  }, []);
 
   const load = useCallback(async () => {
+    if (!accessToken) return;
     setLoading(true);
     setError(null);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
       const { data, error: fnErr } = await supabase.functions.invoke('unifi-status', {
         body: {},
-        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (fnErr) throw new Error(fnErr.message);
       if (data?.error) throw new Error(data.error);
@@ -166,7 +201,7 @@ export function useUnifiSites() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   return { sites, loading, error, reload: load };
 }

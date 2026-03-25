@@ -77,9 +77,19 @@ export interface UnifiHost {
   };
 }
 
+export interface UniFiInfraOfflineDevice {
+  name?:      string;
+  ipAddress?: string;
+  mac?:       string;
+  type?:      string;
+  state?:     string;
+}
+
 export interface UnifiStatus {
   site: UnifiSite | null;
   host: UnifiHost | null;
+  // Best-effort enrichment from the edge function.
+  infraOfflineDevices?: UniFiInfraOfflineDevice[];
 }
 
 export interface UnifiSiteListItem {

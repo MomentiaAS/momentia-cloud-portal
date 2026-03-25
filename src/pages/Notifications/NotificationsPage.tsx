@@ -72,6 +72,10 @@ export function NotificationsPage() {
               data?.host?.reportedState?.hardware?.shortname ??
               data?.host?.reportedState?.hardware?.name ??
               'UniFi Gateway';
+            const infraOfflineDevices = (data as any)?.infraOfflineDevices as Array<{
+              name?: string;
+              ipAddress?: string;
+            }> | undefined;
             const offlineGateway = (counts.offlineGatewayDevice ?? 0) as number;
             const offlineWired   = (counts.offlineWiredDevice   ?? 0) as number;
             const offlineWifi    = (counts.offlineWifiDevice    ?? 0) as number;
@@ -91,12 +95,19 @@ export function NotificationsPage() {
             }
 
             if (infraOffline) {
+              const infraLines = (infraOfflineDevices ?? []).map(d => {
+                const name = d.name ?? 'Unknown device';
+                return d.ipAddress ? `- ${name} (${d.ipAddress})` : `- ${name}`;
+              });
+              const infraDevicesText = infraLines.length > 0
+                ? `\nOffline devices:\n${infraLines.join('\n')}`
+                : '';
               await upsertUnifiOfflineAlert({
                 customerId: customer.id,
                 source:     'unifi-offline-infra',
                 severity:   'medium',
                 title:      'UniFi: Infrastructure offline',
-                message:    `Customer: ${customer.name}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Gateway: ${gatewayName}. Site: ${customer.unifiSiteId}`,
+                message:    `Customer: ${customer.name}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Gateway: ${gatewayName}. Site: ${customer.unifiSiteId}.${infraDevicesText}`,
               });
             } else {
               await resolveUnifiOfflineAlerts({ customerId: customer.id, source: 'unifi-offline-infra' });
@@ -240,7 +251,7 @@ export function NotificationsPage() {
                   {!item.unread && <Badge variant="default">Read</Badge>}
                 </div>
                 <p className="text-sm font-semibold text-text-primary">{item.title}</p>
-                <p className="text-sm text-text-secondary mt-0.5">
+                <p className="text-sm text-text-secondary mt-0.5 whitespace-pre-wrap">
                   {item.kind === 'warranty' && <ShieldAlert className="size-3.5 inline mr-1" />}
                   {item.message}
                 </p>

@@ -546,6 +546,7 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
     const offlineWifi    = (counts.offlineWifiDevice    ?? 0) as number;
     const gatewayOffline = offlineGateway > 0;
     const infraOffline   = (offlineWired + offlineWifi) > 0;
+    const infraOfflineDevices = status.infraOfflineDevices ?? [];
 
     const syncAlerts = async () => {
       try {
@@ -569,12 +570,19 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
         }
 
         if (infraOffline) {
+          const infraLines = infraOfflineDevices.map(d => {
+            const name = d.name ?? 'Unknown device';
+            return d.ipAddress ? `- ${name} (${d.ipAddress})` : `- ${name}`;
+          });
+          const infraDevicesText = infraLines.length > 0
+            ? `\nOffline devices:\n${infraLines.join('\n')}`
+            : '';
           await upsertUnifiOfflineAlert({
             customerId,
             source:   'unifi-offline-infra',
             severity: 'medium',
             title:    'UniFi: Infrastructure offline',
-            message:  `Customer: ${customerName}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Gateway: ${gatewayName}. Site: ${siteId}`,
+            message:  `Customer: ${customerName}. UniFi infrastructure reports offline (offlineWiredDevice: ${offlineWired}, offlineWifiDevice: ${offlineWifi}). Gateway: ${gatewayName}. Site: ${siteId}.${infraDevicesText}`,
           });
         } else {
           await resolveUnifiOfflineAlerts({ customerId, source: 'unifi-offline-infra' });

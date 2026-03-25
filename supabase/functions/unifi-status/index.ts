@@ -10,11 +10,25 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const UNIFI_API_KEY = Deno.env.get('UNIFI_API_KEY') ?? '';
-const UNIFI_BASE = Deno.env.get('UNIFI_BASE') ?? 'https://api.ui.com';
+function getUnifiBase() {
+  // Support both casing styles for Supabase secret names.
+  return Deno.env.get('UNIFI_BASE') ?? Deno.env.get('unifi_base') ?? 'https://api.ui.com';
+}
 // Some UniFi installations expose proxy/network endpoints under a different host
 // (e.g. `https://<id>.id.ui.direct`). When this is configured, proxy calls can
 // fall back to it if `api.ui.com` returns 401/403.
-const UNIFI_DIRECT_BASE = Deno.env.get('UNIFI_DIRECT_BASE') ?? '';
+function getUnifiDirectBase() {
+  // Keep this dynamic so changing secrets doesn't require a cold restart.
+  // Supabase secret names are typically lowercase, so we check both.
+  return Deno.env.get('UNIFI_DIRECT_BASE') ?? Deno.env.get('unifi_direct_base') ?? '';
+}
+
+function getUnifiDirectBaseFlags() {
+  return {
+    directUpperSet: !!Deno.env.get('UNIFI_DIRECT_BASE'),
+    directLowerSet: !!Deno.env.get('unifi_direct_base'),
+  };
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -41,8 +55,9 @@ async function unifi(base: string, path: string) {
 }
 
 async function unifiProxy(path: string) {
-  const bases = [UNIFI_BASE];
-  if (UNIFI_DIRECT_BASE) bases.push(UNIFI_DIRECT_BASE);
+  const bases = [getUnifiBase()];
+  const directBase = getUnifiDirectBase();
+  if (directBase) bases.push(directBase);
 
   const errors: Array<{ base: string; message: string }> = [];
   for (const base of bases) {
@@ -294,7 +309,27 @@ serve(async (req) => {
       };
     }
 
-    return json({ siteId, results, offlineInfraHostsSample, offlineNonConsoleHostsSample });
+    return json({
+      siteId,
+      results,
+      offlineInfraHostsSample,
+      offlineNonConsoleHostsSample,
+      debugEnv: {
+        unifiBase: getUnifiBase(),
+        unifiApiKeySet: !!UNIFI_API_KEY,
+        directBaseSet: !!getUnifiDirectBase(),
+        directBase: getUnifiDirectBase() || null,
+        envKeys: (() => {
+          try {
+            const keys = Array.from(Deno.env.keys()).map(k => String(k));
+            return keys.slice(0, 60);
+          } catch {
+            return [];
+          }
+        })(),
+        ...getUnifiDirectBaseFlags(),
+      },
+    });
   }
 
   try {

@@ -65,7 +65,11 @@ function sortAssets(
 
 // ── PDF export ────────────────────────────────────────────────────────────────
 
-function exportToPdf(assets: Asset[], customerMap: Record<string, string>) {
+function exportToPdf(
+  assets: Asset[],
+  customerMap: Record<string, string>,
+  scopeLabel?: string,
+) {
   const now = new Date().toLocaleString();
   const rows = assets.map(a => {
     const ws = warrantyStatus(a.warrantyEnd);
@@ -89,7 +93,7 @@ function exportToPdf(assets: Asset[], customerMap: Record<string, string>) {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Asset Register — ${now}</title>
+  <title>Asset Register${scopeLabel ? ` — ${scopeLabel}` : ''} — ${now}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 24px; }
@@ -112,7 +116,7 @@ function exportToPdf(assets: Asset[], customerMap: Record<string, string>) {
 </head>
 <body>
   <h1>Asset Register</h1>
-  <p class="meta">Exported ${now} · ${assets.length} asset${assets.length !== 1 ? 's' : ''}</p>
+  <p class="meta">Exported ${now}${scopeLabel ? ` · ${scopeLabel}` : ''} · ${assets.length} asset${assets.length !== 1 ? 's' : ''}</p>
   <table>
     <thead>
       <tr>
@@ -244,6 +248,7 @@ export function AssetsPage() {
   const { customers } = useCustomers();
 
   const [query,        setQuery]        = useState('');
+  const [customerFilter, setCustomerFilter] = useState<string>('All');
   const [typeFilter,   setTypeFilter]   = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [sortKey,      setSortKey]      = useState<SortKey>('customer');
@@ -268,6 +273,7 @@ export function AssetsPage() {
     const base = assets.filter(a => {
       if (typeFilter   !== 'All' && a.type   !== typeFilter)   return false;
       if (statusFilter !== 'All' && a.status !== statusFilter) return false;
+      if (customerFilter !== 'All' && a.customerId !== customerFilter) return false;
       if (!q) return true;
       const cName = customerMap[a.customerId]?.toLowerCase() ?? '';
       return (
@@ -281,7 +287,7 @@ export function AssetsPage() {
       );
     });
     return sortAssets(base, customerMap, sortKey, sortDir);
-  }, [assets, typeFilter, statusFilter, query, customerMap, sortKey, sortDir]);
+  }, [assets, typeFilter, statusFilter, customerFilter, query, customerMap, sortKey, sortDir]);
 
   const expiringCount = assets.filter(a => {
     const ws = warrantyStatus(a.warrantyEnd);
@@ -307,7 +313,12 @@ export function AssetsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportToPdf(filtered, customerMap)}
+            onClick={() => {
+              const scopeLabel = customerFilter === 'All'
+                ? undefined
+                : (customerMap[customerFilter] ?? 'Customer');
+              exportToPdf(filtered, customerMap, scopeLabel);
+            }}
             disabled={filtered.length === 0}
           >
             <FileDown className="size-4" />
@@ -336,6 +347,16 @@ export function AssetsPage() {
             onChange={e => setQuery(e.target.value)}
           />
         </div>
+        <select
+          value={customerFilter}
+          onChange={e => setCustomerFilter(e.target.value)}
+          className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+        >
+          <option value="All">All customers</option>
+          {customers.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
   Laptop, Server, Network, Smartphone, Printer, Package,
-  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown,
+  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -11,6 +11,7 @@ import { Input } from '../../components/ui/Input';
 import { cn } from '../../components/ui/cn';
 import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
+import { deleteAsset } from '../../lib/db';
 import type { Asset, AssetType } from '../../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -257,16 +258,21 @@ function SortTh({
 
 // ── Asset row ─────────────────────────────────────────────────────────────────
 
-function AssetRow({ asset, customerName, onViewCustomer }: {
+function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete }: {
   asset: Asset;
   customerName: string;
   onViewCustomer: (id: string) => void;
+  onEdit: (asset: Asset) => void;
+  onDelete: (asset: Asset) => void;
 }) {
   const { icon: Icon, label: typeLabel } = TYPE_META[asset.type] ?? TYPE_META.other;
   const ws = warrantyStatus(asset.warrantyEnd);
 
   return (
-    <tr className="border-b border-border hover:bg-surface-raised/40 transition-colors">
+    <tr
+      className="border-b border-border hover:bg-surface-raised/40 transition-colors cursor-pointer"
+      onClick={() => onViewCustomer(asset.customerId)}
+    >
       <td className="px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className="size-7 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0">
@@ -283,7 +289,10 @@ function AssetRow({ asset, customerName, onViewCustomer }: {
       <td className="px-4 py-3 text-xs text-text-secondary">{typeLabel}</td>
       <td className="px-4 py-3">
         <button
-          onClick={() => onViewCustomer(asset.customerId)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewCustomer(asset.customerId);
+          }}
           className="text-xs text-accent hover:underline flex items-center gap-1"
         >
           {customerName}
@@ -292,6 +301,7 @@ function AssetRow({ asset, customerName, onViewCustomer }: {
       </td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.assignedTo ?? '—'}</td>
+      <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
       <td className="px-4 py-3">
         <span className={cn(
@@ -314,6 +324,32 @@ function AssetRow({ asset, customerName, onViewCustomer }: {
             {ws === 'soon'    && ' (soon)'}
           </span>
         )}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1 justify-end">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(asset);
+            }}
+            aria-label="Edit asset"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(asset);
+            }}
+            aria-label="Delete asset"
+          >
+            <Trash2 className="size-3.5 text-red-500" />
+          </Button>
+        </div>
       </td>
     </tr>
   );
@@ -347,6 +383,7 @@ export function AssetsPage() {
   const [sortDir,      setSortDir]      = useState<SortDir>('asc');
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
@@ -360,6 +397,23 @@ export function AssetsPage() {
       setSortKey(key);
       setSortDir('asc');
     }
+  }
+
+  async function handleDelete(asset: Asset) {
+    if (!window.confirm(`Delete asset "${asset.name}"?`)) return;
+    setDeletingId(asset.id);
+    try {
+      await deleteAsset(asset.id);
+      await reload();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Failed to delete asset');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleEdit(asset: Asset) {
+    navigate(`/customers/${asset.customerId}?tab=assets`);
   }
 
   const filtered = useMemo(() => {
@@ -541,6 +595,9 @@ export function AssetsPage() {
                       onSort={handleSort}
                     />
                   ))}
+                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                    Model
+                  </th>
                   {/* IP Address — display only */}
                   <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                     IP Address
@@ -555,6 +612,9 @@ export function AssetsPage() {
                       onSort={handleSort}
                     />
                   ))}
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -564,6 +624,8 @@ export function AssetsPage() {
                     asset={a}
                     customerName={customerMap[a.customerId] ?? 'Unknown'}
                     onViewCustomer={id => navigate(`/customers/${id}`)}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
                   />
                 ))}
               </tbody>
@@ -571,6 +633,9 @@ export function AssetsPage() {
           )}
         </CardBody>
       </Card>
+      {deletingId && (
+        <p className="text-xs text-text-muted">Deleting asset…</p>
+      )}
     </div>
   );
 }

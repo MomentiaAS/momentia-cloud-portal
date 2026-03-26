@@ -25,6 +25,7 @@ import { CustomerForm } from './CustomerForm';
 import { AssetForm } from '../Assets/AssetForm';
 import { DocumentationTab } from './DocumentationTab';
 import { CustomerFilesTab } from './CustomerFilesTab';
+import { formatDateNo } from '../../lib/dateFormat';
 import type { Customer, Alert, BackupJob, LogEntry, Asset } from '../../types';
 import type { HealthStatus, Severity } from '../../types';
 import type { UserRole } from '../../context/AuthContext';
@@ -219,8 +220,8 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   {(asset.os || asset.warrantyEnd || asset.purchaseDate) && (
                     <p className="text-xs text-text-muted mt-0.5">
                       {asset.os && <span>{asset.os}</span>}
-                      {asset.warrantyEnd && <span className={cn('ml-2', ws === 'expired' ? 'text-red-500' : ws === 'soon' ? 'text-amber-500' : '')}>· Warranty: {asset.warrantyEnd}</span>}
-                      {asset.purchaseDate && <span className="ml-2">· Purchased: {asset.purchaseDate}</span>}
+                      {asset.warrantyEnd && <span className={cn('ml-2', ws === 'expired' ? 'text-red-500' : ws === 'soon' ? 'text-amber-500' : '')}>· Warranty: {formatDateNo(asset.warrantyEnd)}</span>}
+                      {asset.purchaseDate && <span className="ml-2">· Purchased: {formatDateNo(asset.purchaseDate)}</span>}
                     </p>
                   )}
                 </div>
@@ -289,8 +290,8 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   ['IP address', selected.ipAddress ?? '—'],
                   ['MAC address', selected.macAddress ?? '—'],
                   ['Location', selected.location ?? '—'],
-                  ['Purchase date', selected.purchaseDate ?? '—'],
-                  ['Warranty', selected.warrantyEnd ?? '—'],
+                  ['Purchase date', formatDateNo(selected.purchaseDate)],
+                  ['Warranty', formatDateNo(selected.warrantyEnd)],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <dt className="text-xs text-text-muted uppercase tracking-wider">{label}</dt>

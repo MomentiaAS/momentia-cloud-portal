@@ -9,6 +9,7 @@ import { useAlerts } from '../../../hooks/useAlerts';
 import { useAllAssets } from '../../../hooks/useAssets';
 import { useCustomers } from '../../../hooks/useCustomers';
 import { cn } from '../../../components/ui/cn';
+import { formatDateNo } from '../../../lib/dateFormat';
 import { formatDistanceToNow } from 'date-fns';
 
 const WARRANTY_WARN_DAYS = 90;
@@ -143,7 +144,7 @@ export function CriticalAlertsCard({ className }: { className?: string }) {
                   <p className="text-sm text-text-primary font-medium mt-0.5 truncate">{w.title}</p>
                   <p className="text-xs text-text-muted">
                     <ShieldAlert className="size-3 inline mr-1" />
-                    Warranty: {w.warrantyEnd}
+                    Warranty: {formatDateNo(w.warrantyEnd)}
                   </p>
                 </div>
                 <Button

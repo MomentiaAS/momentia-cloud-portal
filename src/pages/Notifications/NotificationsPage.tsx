@@ -11,6 +11,7 @@ import { useCustomers } from '../../hooks/useCustomers';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { upsertUnifiOfflineAlert, resolveUnifiOfflineAlerts } from '../../lib/db';
+import { formatDateNo } from '../../lib/dateFormat';
 import { formatDistanceToNow } from 'date-fns';
 
 const READ_WARRANTY_KEY  = 'momentia-read-warranty-alerts';
@@ -173,7 +174,7 @@ export function NotificationsPage() {
       title: alert.title,
       source: alert.source,
       severity: alert.severity,
-      message: `Warranty date: ${alert.warrantyEnd}`,
+      message: `Warranty date: ${formatDateNo(alert.warrantyEnd)}`,
       timestamp: alert.timestamp,
       unread: alert.unread,
     })),

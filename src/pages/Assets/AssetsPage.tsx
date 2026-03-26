@@ -13,6 +13,7 @@ import { ResizableColGroup, ResizableTh, useResizableColumns } from '../../compo
 import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
 import { deleteAsset, insertAsset, updateAsset } from '../../lib/db';
+import { formatDateNo } from '../../lib/dateFormat';
 import { AssetForm } from './AssetForm';
 import type { Asset, AssetType } from '../../types';
 
@@ -96,7 +97,7 @@ function exportToPdf(
   const rows = assets.map(a => {
     const ws = warrantyStatus(a.warrantyEnd);
     const warLabel = a.warrantyEnd
-      ? `${a.warrantyEnd}${ws === 'expired' ? ' ⚠ expired' : ws === 'soon' ? ' ⚠ soon' : ''}`
+      ? `${formatDateNo(a.warrantyEnd)}${ws === 'expired' ? ' ⚠ expired' : ws === 'soon' ? ' ⚠ soon' : ''}`
       : '—';
     return `
       <tr>
@@ -111,7 +112,7 @@ function exportToPdf(
         <td class="mono">${a.ipAddress ?? '—'}</td>
         <td class="mono">${a.macAddress ?? '—'}</td>
         <td>${a.status}</td>
-        <td class="mono">${a.purchaseDate ?? '—'}</td>
+        <td class="mono">${formatDateNo(a.purchaseDate)}</td>
         <td class="${ws === 'expired' ? 'warn-expired' : ws === 'soon' ? 'warn-soon' : ''}">${warLabel}</td>
       </tr>`;
   }).join('');
@@ -227,7 +228,7 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
   const rows = assets.map(a => {
     const ws = warrantyStatus(a.warrantyEnd);
     const warLabel = a.warrantyEnd
-      ? `${a.warrantyEnd}${ws === 'expired' ? ' ⚠ expired' : ws === 'soon' ? ' ⚠ soon' : ''}`
+      ? `${formatDateNo(a.warrantyEnd)}${ws === 'expired' ? ' ⚠ expired' : ws === 'soon' ? ' ⚠ soon' : ''}`
       : '—';
 
     const assetLabel = [a.name, a.make || a.model ? `${a.make || ''}${a.model ? ` ${a.model}` : ''}`.trim() : '']
@@ -246,7 +247,7 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
       a.ipAddress ?? '—',
       a.macAddress ?? '—',
       a.status,
-      a.purchaseDate ?? '—',
+      formatDateNo(a.purchaseDate),
       warLabel,
     ].map(csvEscape);
   });
@@ -361,7 +362,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
                                        'bg-surface text-text-muted border border-border',
         )}>{asset.status}</span>
       </td>
-      <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.purchaseDate ?? '—'}</td>
+      <td className="px-4 py-3 text-xs text-text-muted font-mono">{formatDateNo(asset.purchaseDate)}</td>
       <td className="px-4 py-3">
         {ws === null ? <span className="text-xs text-text-muted">—</span> : (
           <span className={cn(
@@ -370,7 +371,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
             ws === 'soon'    ? 'text-amber-500 font-medium' :
                                'text-text-muted',
           )}>
-            {asset.warrantyEnd}
+            {formatDateNo(asset.warrantyEnd)}
             {ws === 'expired' && ' (expired)'}
             {ws === 'soon'    && ' (soon)'}
           </span>
@@ -840,8 +841,8 @@ export function AssetsPage() {
                   ['IP address', selectedAsset.ipAddress ?? '—'],
                   ['MAC address', selectedAsset.macAddress ?? '—'],
                   ['Location', selectedAsset.location ?? '—'],
-                  ['Purchase date', selectedAsset.purchaseDate ?? '—'],
-                  ['Warranty', selectedAsset.warrantyEnd ?? '—'],
+                  ['Purchase date', formatDateNo(selectedAsset.purchaseDate)],
+                  ['Warranty', formatDateNo(selectedAsset.warrantyEnd)],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <dt className="text-xs text-text-muted uppercase tracking-wider">{label}</dt>

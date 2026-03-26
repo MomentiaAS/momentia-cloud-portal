@@ -110,6 +110,23 @@ export function useCustomers() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Event-driven fallback for environments where Supabase realtime is blocked.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ customerId: string; health: Customer['health'] }>;
+      const id = ce.detail?.customerId;
+      const health = ce.detail?.health;
+      if (!id || !health) return;
+
+      setCustomers(prev =>
+        prev.map(c => (c.id === id ? { ...c, health } : c)),
+      );
+    };
+
+    window.addEventListener('customer-health-updated', handler);
+    return () => window.removeEventListener('customer-health-updated', handler);
+  }, []);
+
   async function addCustomer(data: CustomerFormPayload): Promise<void> {
     const created = await insertCustomer(payloadToDb(data));
     setCustomers(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));

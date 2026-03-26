@@ -537,8 +537,16 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
     savedRef.current = true;
     const health = computeUnifiHealth(status);
     onHealthChange?.(health);
-    // Fire-and-forget — we don't surface errors here to avoid noisy UI
-    updateCustomer(customerId, { health }).catch(console.error);
+    // Update DB, then notify the Customers list so its table can re-render.
+    updateCustomer(customerId, { health })
+      .then(() => {
+        window.dispatchEvent(
+          new CustomEvent('customer-health-updated', {
+            detail: { customerId, health },
+          }),
+        );
+      })
+      .catch(console.error);
   }, [status, customerId, onHealthChange]);
 
   // Sync UniFi offline alerts for this customer when data arrives (once per open).
@@ -672,7 +680,7 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
   const devices = status?.devices ?? [];
   const clients = status?.clients ?? [];
   const inventorySource = status?.inventorySource ?? 'none';
-  const inventoryLimited = inventorySource === 'hosts_fallback';
+  const inventoryAvailable = inventorySource === 'proxy';
 
   const sortedDevices = [...devices].sort((a, b) => Number(isOfflineState(b.state)) - Number(isOfflineState(a.state)));
   const sortedClients = [...clients].sort((a, b) => Number(isOfflineState(b.state)) - Number(isOfflineState(a.state)));
@@ -752,8 +760,8 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
               {offlineDevices > 0 && (
                 <p className="text-xs text-red-500">{offlineDevices} offline</p>
               )}
-              {inventoryLimited && totalDevices != null && devices.length < totalDevices && (
-                <p className="text-xs text-text-muted">{devices.length} / {totalDevices} listed</p>
+              {!inventoryAvailable && totalDevices != null && (
+                <p className="text-xs text-text-muted">Detailed listing unavailable</p>
               )}
             </div>
           </button>
@@ -769,6 +777,9 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
               <p className="text-sm font-semibold text-text-primary">{totalClients ?? '—'}</p>
               {wiredClients != null && wifiClients != null && (
                 <p className="text-xs text-text-muted">{wiredClients} wired · {wifiClients} wifi</p>
+              )}
+              {!inventoryAvailable && totalClients != null && (
+                <p className="text-xs text-text-muted">Detailed listing unavailable</p>
               )}
             </div>
           </button>
@@ -796,13 +807,16 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
-              {totalDevices != null && devices.length < totalDevices && (
-                <div className="rounded-lg border border-amber-300/50 bg-amber-50/40 dark:bg-amber-900/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                  Showing {devices.length} discovered device{devices.length !== 1 ? 's' : ''} of {totalDevices} total from UniFi statistics.
+              {(!inventoryAvailable || sortedDevices.length === 0) ? (
+                <div className="rounded-lg border border-amber-300/50 bg-amber-50/40 dark:bg-amber-900/10 px-3 py-3">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Aggregate-only mode
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    Detailed device inventory couldn&apos;t be fetched from UniFi in this deployment.
+                    You&apos;ll still see accurate counts from UniFi statistics.
+                  </p>
                 </div>
-              )}
-              {sortedDevices.length === 0 ? (
-                <p className="text-sm text-text-muted">No device inventory returned.</p>
               ) : (
                 sortedDevices.map(d => {
                   const offline = isOfflineState(d.state);
@@ -851,8 +865,16 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
-              {sortedClients.length === 0 ? (
-                <p className="text-sm text-text-muted">No client inventory returned.</p>
+              {(!inventoryAvailable || sortedClients.length === 0) ? (
+                <div className="rounded-lg border border-amber-300/50 bg-amber-50/40 dark:bg-amber-900/10 px-3 py-3">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Aggregate-only mode
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    Detailed client inventory couldn&apos;t be fetched from UniFi in this deployment.
+                    You&apos;ll still see accurate counts from UniFi statistics.
+                  </p>
+                </div>
               ) : (
                 sortedClients.map(d => {
                   const offline = isOfflineState(d.state);

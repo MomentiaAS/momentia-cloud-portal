@@ -586,7 +586,19 @@ serve(async (req) => {
       state: d?.reportedState?.state ?? d?.state ?? d?.status ?? null,
     })).slice(0, 200);
 
-    return json({ site, host, infraOfflineDevices, devices, clients, inventorySource });
+    // Aggregate-only mode: if we couldn't fetch the full per-device inventory via
+    // the proxy endpoints, don't return partial/incorrect device lists.
+    // The UI will still show UniFi aggregate counters from `site.statistics.counts`.
+    const canReturnInventory = inventorySource === 'proxy';
+
+    return json({
+      site,
+      host,
+      infraOfflineDevices,
+      devices: canReturnInventory ? devices : [],
+      clients: canReturnInventory ? clients : [],
+      inventorySource,
+    });
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

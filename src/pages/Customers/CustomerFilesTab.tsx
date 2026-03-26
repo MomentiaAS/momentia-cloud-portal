@@ -253,15 +253,17 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
         </div>
       </div>
 
-      {canEdit && selectedIds.length > 0 && (
+      {selectedIds.length > 0 && (
         <div className="px-3 py-2 border-b border-border flex items-center gap-2">
           <span className="text-xs text-text-muted">{selectedIds.length} selected</span>
           <Button size="sm" variant="outline" onClick={() => void handleBulkDownload()}>
             <Download className="size-3.5 mr-1" /> Download selected
           </Button>
-          <Button size="sm" variant="outline" onClick={() => void handleBulkDelete()} className="text-red-500 border-red-200 dark:border-red-900">
-            <Trash2 className="size-3.5 mr-1" /> Delete selected
-          </Button>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => void handleBulkDelete()} className="text-red-500 border-red-200 dark:border-red-900">
+              <Trash2 className="size-3.5 mr-1" /> Delete selected
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
             Clear
           </Button>
@@ -314,15 +316,13 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
               key={node.id}
               className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface/80"
             >
-              {canEdit && (
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(node.id)}
-                  onChange={() => toggleSelected(node.id)}
-                  className="accent-accent size-3.5 shrink-0"
-                  aria-label={`Select ${node.name}`}
-                />
-              )}
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(node.id)}
+                onChange={() => toggleSelected(node.id)}
+                className="accent-accent size-3.5 shrink-0"
+                aria-label={`Select ${node.name}`}
+              />
               {node.kind === 'folder' ? (
                 <button
                   type="button"
@@ -365,7 +365,7 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
           ))
         )}
       </div>
-      {canEdit && items.length > 0 && (
+      {items.length > 0 && (
         <div className="px-3 py-2 border-t border-border flex items-center justify-between text-xs text-text-muted">
           <button
             type="button"

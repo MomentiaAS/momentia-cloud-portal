@@ -58,6 +58,8 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
   const [saveBusy, setSaveBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const shouldFocusTitleRef = useRef(false);
 
   const selected = sections.find(s => s.id === selectedId) ?? null;
   const sectionsRef = useRef(sections);
@@ -146,6 +148,7 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     setAddBusy(true);
     try {
       const created = await addSection();
+      shouldFocusTitleRef.current = true;
       applySection(created.id, {
         title: created.title,
         body: created.body ?? '',
@@ -157,6 +160,16 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
       setAddBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!shouldFocusTitleRef.current) return;
+    if (!selectedId) return;
+    const el = titleInputRef.current;
+    if (!el) return;
+    shouldFocusTitleRef.current = false;
+    el.focus();
+    el.select();
+  }, [selectedId]);
 
   async function handleDelete() {
     if (!selected) return;
@@ -256,6 +269,7 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
             <div className="shrink-0 flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border gap-y-2">
               {canEdit ? (
                 <input
+                  ref={titleInputRef}
                   type="text"
                   value={draftTitle}
                   onChange={e => { setDraftTitle(e.target.value); }}

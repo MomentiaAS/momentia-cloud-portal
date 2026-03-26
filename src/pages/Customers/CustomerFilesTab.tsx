@@ -56,6 +56,8 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
   } = useCustomerFiles(customerId);
 
   const [folderId, setFolderId] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const items = useMemo(
@@ -94,6 +96,7 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
       }
     }
     if (fileRef.current) fileRef.current.value = '';
+    setUploadOpen(false);
   }
 
   async function handleDownload(node: CustomerFileNode) {
@@ -186,7 +189,7 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
               </button>
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
+                onClick={() => setUploadOpen(v => !v)}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-accent hover:bg-accent/10"
               >
                 <Upload className="size-3.5" /> Upload
@@ -202,6 +205,43 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
           )}
         </div>
       </div>
+
+      {canEdit && uploadOpen && (
+        <div className="px-3 py-3 border-b border-border">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              // Only deactivate when leaving the dropzone element itself.
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setDragActive(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+              void handleFilesChosen(e.dataTransfer.files);
+            }}
+            className={cn(
+              'w-full rounded-lg border-2 border-dashed p-6 text-center transition-colors',
+              dragActive
+                ? 'border-accent bg-accent/10'
+                : 'border-border bg-surface hover:bg-surface/80',
+            )}
+          >
+            <p className="text-sm font-medium text-text-primary">Drag and drop files here</p>
+            <p className="text-xs text-text-muted mt-1">or click to choose files</p>
+          </button>
+        </div>
+      )}
 
       <div className="divide-y divide-border flex-1 overflow-y-auto max-h-[min(60vh,560px)]">
         {items.length === 0 ? (

@@ -296,7 +296,7 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
                 type="submit"
                 variant="primary"
                 size="sm"
-                disabled={busy || !name || !email || !password || (needsCustomerScope && !initialCustomerId)}
+                disabled={busy || !firstName.trim() || !lastName.trim() || !email.trim() || !password || (needsCustomerScope && !initialCustomerId)}
               >
                 {busy ? 'Creating…' : 'Create User'}
               </Button>

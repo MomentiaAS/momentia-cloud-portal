@@ -266,32 +266,6 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
   // window.alert('CSV export started');
 }
 
-// ── Sortable header cell ──────────────────────────────────────────────────────
-
-function SortTh({
-  label, sortKey, active, dir, onSort,
-}: {
-  label: string; sortKey: SortKey;
-  active: boolean; dir: SortDir;
-  onSort: (k: SortKey) => void;
-}) {
-  const Icon = active ? (dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
-  return (
-    <th className="px-4 py-2.5">
-      <button
-        onClick={() => onSort(sortKey)}
-        className={cn(
-          'flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider transition-colors',
-          active ? 'text-accent' : 'text-text-muted hover:text-text-primary',
-        )}
-      >
-        {label}
-        <Icon className="size-3 shrink-0" />
-      </button>
-    </th>
-  );
-}
-
 function ResizableSortTh({
   colKey,
   label,

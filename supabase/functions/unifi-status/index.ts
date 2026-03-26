@@ -135,6 +135,34 @@ function getHostSiteId(d: AnyObj): string | null {
   return d?.siteId ?? d?.site_id ?? d?.site ?? null;
 }
 
+function normalizeMac(input?: string | null): string {
+  return String(input ?? '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+}
+
+function hostMatchesSiteGateway(host: AnyObj, site: AnyObj | null): boolean {
+  if (!site) return false;
+
+  const siteHostId = String(site?.hostId ?? '');
+  const hostId = String(host?.id ?? '');
+  if (siteHostId && hostId && siteHostId === hostId) return true;
+
+  const siteGatewayMacNorm = normalizeMac(site?.meta?.gatewayMac ?? null);
+  if (!siteGatewayMacNorm) return false;
+
+  const hostMacNorm = normalizeMac(
+    pickDeviceMac(host)
+    ?? host?.reportedState?.hardware?.mac
+    ?? host?.reportedState?.mac
+    ?? null,
+  );
+  if (hostMacNorm && hostMacNorm === siteGatewayMacNorm) return true;
+
+  // In /v1/hosts console records, `id` often starts with gateway MAC without separators.
+  if (hostId && hostId.toUpperCase().startsWith(siteGatewayMacNorm)) return true;
+
+  return false;
+}
+
 function isProbablyClientHost(d: AnyObj): boolean {
   const type = String(d?.type ?? d?.deviceType ?? '').toLowerCase();
   return type.includes('client');
@@ -517,7 +545,13 @@ serve(async (req) => {
     // successfully to build `hostById`.
     if (devicesRaw.length === 0 || clientsRaw.length === 0) {
       const siteHosts = rawHosts.filter(h => String(getHostSiteId(h)) === String(siteId));
-      const hostsForInventory = siteHosts.length > 0 ? siteHosts : rawHosts;
+      const gatewayHosts = rawHosts.filter(h => hostMatchesSiteGateway(h, site));
+      const hostsForInventory =
+        siteHosts.length > 0
+          ? siteHosts
+          : gatewayHosts.length > 0
+            ? gatewayHosts
+            : [];
 
       if (devicesRaw.length === 0) {
         devicesRaw = hostsForInventory.filter(h => !isProbablyClientHost(h));

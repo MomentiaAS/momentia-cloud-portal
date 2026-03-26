@@ -203,7 +203,7 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
             <Button variant="primary" size="sm" onClick={onClose} className="mt-2">Done</Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" autoComplete="off">
             {error && (
               <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2.5">
                 <AlertCircle className="size-4 text-red-500 mt-0.5 shrink-0" />
@@ -213,15 +213,37 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">First name</label>
-                <input className={inputClass} value={firstName} onChange={e => setFirstName(e.target.value)} required />
+                <input
+                  className={inputClass}
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  required
+                  autoComplete="off"
+                  name="create-user-first-name"
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Last name</label>
-                <input className={inputClass} value={lastName} onChange={e => setLastName(e.target.value)} required />
+                <input
+                  className={inputClass}
+                  value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  required
+                  autoComplete="off"
+                  name="create-user-last-name"
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Email</label>
-                <input type="email" className={inputClass} value={email} onChange={e => setEmail(e.target.value)} required />
+                <input
+                  type="email"
+                  className={inputClass}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoComplete="off"
+                  name="create-user-email"
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Phone</label>
@@ -235,7 +257,16 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Password</label>
-                <input type="password" className={inputClass} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+                <input
+                  type="password"
+                  className={inputClass}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  name="create-user-password"
+                />
               </div>
               {needsCustomerScope && (
                 <div className="flex flex-col gap-1.5 sm:col-span-2">

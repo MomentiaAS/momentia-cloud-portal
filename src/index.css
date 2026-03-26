@@ -41,6 +41,22 @@
     min-height: 100dvh;
   }
 
+  /* Prevent browser autofill from forcing white backgrounds */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus {
+    -webkit-text-fill-color: rgb(var(--color-text-primary));
+    -webkit-box-shadow: 0 0 0px 1000px rgb(var(--color-surface)) inset;
+    box-shadow: 0 0 0px 1000px rgb(var(--color-surface)) inset;
+    caret-color: rgb(var(--color-text-primary));
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }

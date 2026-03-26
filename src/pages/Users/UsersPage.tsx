@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   UserPlus, RefreshCw, Shield, Eye, Wrench, AlertCircle, X,
   ChevronDown, ChevronUp, Trash2, Check,
@@ -39,6 +39,101 @@ const inputClass = cn(
   'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
   'disabled:opacity-50 disabled:cursor-not-allowed transition-colors',
 );
+
+function csvEscape(v: unknown): string {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadTextFile(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportUsersToCsv(rows: Array<{ name: string; email: string; role: string }>) {
+  const header = ['Name', 'Email', 'Role'];
+  const csvRows = rows.map(r => [r.name, r.email, r.role].map(csvEscape));
+  const csv = ['\uFEFF' + header.join(','), ...csvRows.map(r => r.join(','))].join('\n');
+  downloadTextFile(`users_export_${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
+function exportUsersToPdf(rows: Array<{ name: string; email: string; role: string }>) {
+  const now = new Date().toLocaleString();
+  const bodyRows = rows.map(r => `
+    <tr>
+      <td>${r.name || '—'}</td>
+      <td>${r.email}</td>
+      <td>${r.role}</td>
+    </tr>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Users — ${now}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 24px; }
+    h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .meta { font-size: 10px; color: #666; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 10px;
+         text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid #d1d5db; }
+    td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    @media print { body { padding: 0; } @page { margin: 1.5cm; size: A4 landscape; } }
+  </style>
+</head>
+<body>
+  <h1>Users</h1>
+  <p class="meta">Exported ${now} · ${rows.length} user${rows.length !== 1 ? 's' : ''}</p>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+</body>
+</html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  const win = iframe.contentWindow;
+  if (!doc || !win) {
+    iframe.remove();
+    window.alert('PDF export blocked by the browser.');
+    return;
+  }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      setTimeout(() => iframe.remove(), 500);
+    }
+  }, 150);
+}
 
 // ── Create User Modal ────────────────────────────────────────────────────────
 
@@ -269,11 +364,13 @@ function UserRow({
   const [assignSaving,   setAssignSaving]   = useState(false);
   const [assignSaved,    setAssignSaved]    = useState(false);
   const [assignError,    setAssignError]    = useState<string | null>(null);
+  const [assignMenuOpen, setAssignMenuOpen] = useState(false);
   const [passwordOpen,   setPasswordOpen]   = useState(false);
   const [passwordDraft,  setPasswordDraft]  = useState('');
   const [passwordBusy,   setPasswordBusy]   = useState(false);
   const [passwordSaved,  setPasswordSaved]  = useState(false);
   const [passwordError,  setPasswordError]  = useState<string | null>(null);
+  const assignMenuRef = useRef<HTMLDivElement | null>(null);
 
   const needsCustomerScope = profile.role === 'technician' || profile.role === 'viewer';
 
@@ -291,6 +388,16 @@ function UserRow({
   useEffect(() => {
     if (expanded) loadAssignments();
   }, [expanded, loadAssignments]);
+
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (assignMenuRef.current && !assignMenuRef.current.contains(e.target as Node)) {
+        setAssignMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
 
   useEffect(() => {
     setNameDraft(profile.name ?? '');
@@ -376,7 +483,10 @@ function UserRow({
   }
 
   return (
-    <div className="border-b border-border last:border-0">
+    <div className={cn(
+      'border-b border-border last:border-0 transition-all',
+      expanded && 'ring-1 ring-accent/40 bg-accent/5 rounded-lg mx-2 my-1 border-accent/30',
+    )}>
       {/* Collapsed row */}
       <button
         className="w-full flex items-center gap-4 px-6 py-4 hover:bg-primary-50 dark:hover:bg-primary-800/20 transition-colors text-left"
@@ -494,42 +604,49 @@ function UserRow({
           {/* Customer assignments — only for technician / viewer */}
           {needsCustomerScope && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-                  Assigned Customers
-                </p>
-              </div>
-
               {assignLoading ? (
                 <p className="text-xs text-text-muted">Loading…</p>
               ) : allCustomers.length === 0 ? (
                 <p className="text-xs text-text-muted italic">No customers in the system yet.</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                  {allCustomers.map(c => {
-                    const checked = assignedIds.includes(c.id);
-                    return (
-                      <label
-                        key={c.id}
-                        className={cn(
-                          'flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm select-none',
-                          checked
-                            ? 'border-accent/50 bg-accent/5 text-text-primary'
-                            : 'border-border bg-surface text-text-secondary hover:border-border/80',
-                          !isSuperAdmin && 'cursor-default pointer-events-none',
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={!isSuperAdmin}
-                          onChange={() => isSuperAdmin && toggleCustomer(c.id)}
-                          className="accent-accent size-3.5 shrink-0"
-                        />
-                        <span className="truncate">{c.name}</span>
-                      </label>
-                    );
-                  })}
+                <div ref={assignMenuRef} className="relative max-w-sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAssignMenuOpen(v => !v)}
+                    rightIcon={assignMenuOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                  >
+                    Assigned customers ({assignedIds.length})
+                  </Button>
+
+                  {assignMenuOpen && (
+                    <div className="absolute z-20 mt-1 w-full min-w-[280px] bg-surface-raised border border-border rounded-lg shadow-popover p-2 max-h-56 overflow-y-auto">
+                      {allCustomers.map(c => {
+                        const checked = assignedIds.includes(c.id);
+                        return (
+                          <label
+                            key={c.id}
+                            className={cn(
+                              'flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer transition-colors text-sm select-none',
+                              checked
+                                ? 'bg-accent/10 text-text-primary'
+                                : 'text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/30',
+                              !isSuperAdmin && 'cursor-default pointer-events-none opacity-80',
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!isSuperAdmin}
+                              onChange={() => isSuperAdmin && toggleCustomer(c.id)}
+                              className="accent-accent size-3.5 shrink-0"
+                            />
+                            <span className="truncate">{c.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -593,6 +710,8 @@ export function UsersPage() {
   const [deleteBusy,   setDeleteBusy]   = useState(false);
   const [deleteError,  setDeleteError]  = useState<string | null>(null);
   const [pageError,    setPageError]    = useState<string | null>(null);
+  const [exportOpen, setExportOpen]     = useState(false);
+  const exportRef = useRef<HTMLDivElement | null>(null);
 
   const isSuperAdmin = currentProfile?.role === 'superadmin';
   const canEditUserNames = isSuperAdmin || currentProfile?.role === 'admin';
@@ -641,6 +760,22 @@ export function UsersPage() {
     }
   }
 
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
+  const exportRows = profiles.map(p => ({
+    name: p.name ?? '',
+    email: p.email,
+    role: ROLES.find(r => r.value === p.role)?.label ?? p.role,
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -650,6 +785,35 @@ export function UsersPage() {
           <p className="text-sm text-text-secondary mt-0.5">Manage portal access, roles, and customer assignments.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <div ref={exportRef} className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(v => !v)}
+              disabled={loading || exportRows.length === 0}
+              rightIcon={exportOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            >
+              Export
+            </Button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => { exportUsersToPdf(exportRows); setExportOpen(false); }}
+                >
+                  Export to PDF
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => { exportUsersToCsv(exportRows); setExportOpen(false); }}
+                >
+                  Export to CSV
+                </button>
+              </div>
+            )}
+          </div>
           <Button variant="ghost" size="icon" onClick={fetchProfiles} aria-label="Refresh">
             <RefreshCw className={cn('size-4', loading && 'animate-spin')} />
           </Button>

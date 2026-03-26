@@ -40,10 +40,10 @@ const statusBadge: Record<JobStatus, React.ComponentProps<typeof Badge>['variant
 
 function JobDrawer({ job, onClose, customerName }: { job: BackupJob; onClose: () => void; customerName: (id: string) => string }) {
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <aside
-        className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover"
+        className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal"
         role="complementary"
         aria-label="Job detail"
       >

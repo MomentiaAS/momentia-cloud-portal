@@ -266,9 +266,9 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 
       {/* Asset detail drawer */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
-          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="absolute inset-0" onClick={() => setSelected(null)} />
+          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selected.name}</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelected(null)} aria-label="Close">
@@ -441,9 +441,9 @@ function BackupTab({ jobs }: { jobs: BackupJob[] }) {
 
       {/* Job detail drawer */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
-          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="absolute inset-0" onClick={() => setSelected(null)} />
+          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selected.jobName}</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelected(null)} aria-label="Close">
@@ -795,9 +795,9 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
 
       {/* Devices drawer */}
       {devicesOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDevicesOpen(false)} />
-          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="absolute inset-0" onClick={() => setDevicesOpen(false)} />
+          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary">
                 Devices ({devices.length})
@@ -853,9 +853,9 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
 
       {/* Clients drawer */}
       {clientsOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setClientsOpen(false)} />
-          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="absolute inset-0" onClick={() => setClientsOpen(false)} />
+          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary">
                 Clients ({clients.length})

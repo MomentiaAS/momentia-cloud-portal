@@ -378,12 +378,15 @@ function LogsTab({ logs }: { logs: LogEntry[] }) {
   return (
     <div className="space-y-0">
       <div className="px-4 py-3 border-b border-border">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Filter logs…"
-          className="h-8 w-full max-w-xs rounded-lg border border-border bg-surface px-3 text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
-        />
+        <div className="max-w-xs">
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Filter logs…"
+            clearable
+            onClear={() => setSearch('')}
+          />
+        </div>
       </div>
       <div className="divide-y divide-border font-mono text-xs">
         {filtered.map(log => (

@@ -1,17 +1,22 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 import { cn } from './cn';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   leftIcon?:  ReactNode;
   rightIcon?: ReactNode;
+  clearable?: boolean;
+  onClear?: () => void;
   label?:     string;
   error?:     string;
   hint?:      string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ leftIcon, rightIcon, label, error, hint, className, id, ...props }, ref) => {
+  ({ leftIcon, rightIcon, clearable, onClear, label, error, hint, className, id, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const valueString = typeof props.value === 'string' ? props.value : '';
+    const showClear = !!clearable && !!onClear && valueString.length > 0 && !props.disabled;
     return (
       <div className="w-full">
         {label && (
@@ -33,14 +38,32 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'disabled:opacity-50 disabled:pointer-events-none',
               'h-9 px-3',
               leftIcon  && 'pl-9',
-              rightIcon && 'pr-9',
+              (rightIcon || showClear) && (rightIcon && showClear ? 'pr-14' : 'pr-9'),
               error && 'border-red-500 focus:ring-red-500',
               className,
             )}
             {...props}
           />
           {rightIcon && (
-            <span className="absolute right-3 text-text-muted pointer-events-none">{rightIcon}</span>
+            <span
+              className={cn(
+                'absolute text-text-muted pointer-events-none',
+                showClear ? 'right-9' : 'right-3',
+              )}
+            >
+              {rightIcon}
+            </span>
+          )}
+          {showClear && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="absolute right-3 text-text-muted hover:text-text-primary"
+              aria-label="Clear"
+              tabIndex={-1}
+            >
+              <X className="size-3.5" />
+            </button>
           )}
         </div>
         {error && <p className="mt-1 text-xs text-red-500">{error}</p>}

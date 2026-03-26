@@ -11,7 +11,7 @@ import { Input } from '../../components/ui/Input';
 import { cn } from '../../components/ui/cn';
 import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
-import { deleteAsset, updateAsset } from '../../lib/db';
+import { deleteAsset, insertAsset, updateAsset } from '../../lib/db';
 import { AssetForm } from './AssetForm';
 import type { Asset, AssetType } from '../../types';
 
@@ -39,7 +39,7 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
 
 // ── Sort ─────────────────────────────────────────────────────────────────────
 
-type SortKey = 'name' | 'type' | 'customer' | 'model' | 'serial' | 'assignedTo' | 'ipAddress' | 'status' | 'warrantyEnd';
+type SortKey = 'name' | 'type' | 'customer' | 'model' | 'serial' | 'assignedTo' | 'ipAddress' | 'macAddress' | 'status' | 'warrantyEnd';
 type SortDir = 'asc' | 'desc';
 
 function sortAssets(
@@ -59,6 +59,7 @@ function sortAssets(
       case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
       case 'assignedTo': av = a.assignedTo  ?? '';              bv = b.assignedTo  ?? '';              break;
       case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
+      case 'macAddress': av = a.macAddress  ?? '';              bv = b.macAddress  ?? '';              break;
       case 'status':     av = a.status;                         bv = b.status;                         break;
       case 'warrantyEnd':av = a.warrantyEnd ?? '';              bv = b.warrantyEnd ?? '';              break;
     }
@@ -88,6 +89,7 @@ function exportToPdf(
         <td class="mono">${a.serial ?? '—'}</td>
         <td>${a.assignedTo ?? '—'}</td>
         <td class="mono">${a.ipAddress ?? '—'}</td>
+        <td class="mono">${a.macAddress ?? '—'}</td>
         <td>${a.status}</td>
         <td class="${ws === 'expired' ? 'warn-expired' : ws === 'soon' ? 'warn-soon' : ''}">${warLabel}</td>
       </tr>`;
@@ -125,7 +127,7 @@ function exportToPdf(
     <thead>
       <tr>
         <th>Asset</th><th>Type</th><th>Customer</th><th>Serial</th>
-        <th>Assigned To</th><th>IP Address</th><th>Status</th><th>Warranty</th>
+        <th>Assigned To</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Warranty</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -192,6 +194,7 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
     'Serial',
     'Assigned To',
     'IP Address',
+    'MAC Address',
     'Status',
     'Warranty',
   ];
@@ -213,6 +216,7 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
       a.serial ?? '—',
       a.assignedTo ?? '—',
       a.ipAddress ?? '—',
+      a.macAddress ?? '—',
       a.status,
       warLabel,
     ].map(csvEscape);
@@ -307,6 +311,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.assignedTo ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
+      <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.macAddress ?? '—'}</td>
       <td className="px-4 py-3">
         <span className={cn(
           'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
@@ -371,6 +376,7 @@ const COLUMNS: { label: string; key: SortKey }[] = [
   { label: 'Serial',      key: 'serial'     },
   { label: 'Assigned To', key: 'assignedTo' },
   { label: 'IP Address',  key: 'ipAddress'  },
+  { label: 'MAC Address', key: 'macAddress' },
   { label: 'Status',      key: 'status'     },
   { label: 'Warranty',    key: 'warrantyEnd'},
 ];
@@ -392,6 +398,8 @@ export function AssetsPage() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [assetFormOpen, setAssetFormOpen] = useState(false);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const [addCustomerId, setAddCustomerId] = useState<string>('');
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
@@ -426,6 +434,12 @@ export function AssetsPage() {
     setSelectedAsset(null);
   }
 
+  function handleAddAsset() {
+    const firstCustomerId = customers[0]?.id ?? '';
+    setAddCustomerId(firstCustomerId);
+    setAddPickerOpen(true);
+  }
+
   function handleOpenDetails(asset: Asset) {
     setSelectedAsset(asset);
   }
@@ -445,6 +459,7 @@ export function AssetsPage() {
         (a.serial?.toLowerCase().includes(q))    ||
         (a.assignedTo?.toLowerCase().includes(q))||
         (a.ipAddress?.toLowerCase().includes(q)) ||
+        (a.macAddress?.toLowerCase().includes(q)) ||
         cName.includes(q)
       );
     });
@@ -482,6 +497,9 @@ export function AssetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleAddAsset} disabled={customers.length === 0}>
+            Add asset
+          </Button>
           <div ref={exportRef} className="relative">
             <Button
               variant="outline"
@@ -544,6 +562,8 @@ export function AssetsPage() {
             placeholder="Search assets…"
             value={query}
             onChange={e => setQuery(e.target.value)}
+            clearable
+            onClear={() => setQuery('')}
           />
         </div>
         <select
@@ -592,17 +612,17 @@ export function AssetsPage() {
           ) : filtered.length === 0 ? (
             <p className="px-6 py-10 text-sm text-center text-text-muted">
               {assets.length === 0
-                ? "No assets yet. Add them from a customer's Assets tab."
+                ? "No assets yet. Add them from this page or from a customer's Assets tab."
                 : 'No assets match your filters.'}
             </p>
           ) : (
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-border bg-surface-raised/50">
-                  {(['name','type','customer','model','serial','assignedTo','ipAddress'] as SortKey[]).map((k, i) => (
+                  {(['name','type','customer','model','serial','assignedTo','ipAddress','macAddress'] as SortKey[]).map((k, i) => (
                     <SortTh
                       key={k}
-                      label={['Asset','Type','Customer','Model','Serial','Assigned To','IP Address'][i]}
+                      label={['Asset','Type','Customer','Model','Serial','Assigned To','IP Address','MAC Address'][i]}
                       sortKey={k}
                       active={sortKey === k}
                       dir={sortDir}
@@ -643,6 +663,54 @@ export function AssetsPage() {
       </Card>
       {deletingId && (
         <p className="text-xs text-text-muted">Deleting asset…</p>
+      )}
+
+      {/* Add asset → pick customer */}
+      {addPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="absolute inset-0" onClick={() => setAddPickerOpen(false)} />
+          <div className="relative z-10 w-full max-w-lg bg-surface-raised border border-border rounded-card shadow-modal">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">Add asset</h2>
+                <p className="text-xs text-text-muted mt-0.5">Select which customer the asset belongs to.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setAddPickerOpen(false)} aria-label="Close">
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-text-secondary">Customer</p>
+                <select
+                  value={addCustomerId}
+                  onChange={e => setAddCustomerId(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                >
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setAddPickerOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    setAddPickerOpen(false);
+                    setEditingAsset(null);
+                    setSelectedAsset(null);
+                    setAssetFormOpen(true);
+                  }}
+                  disabled={!addCustomerId}
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Asset detail drawer */}
@@ -718,8 +786,12 @@ export function AssetsPage() {
         }}
         initial={editingAsset}
         onSave={async (p) => {
-          if (!editingAsset) return;
-          await updateAsset(editingAsset.id, p);
+          if (editingAsset) {
+            await updateAsset(editingAsset.id, p);
+          } else {
+            if (!addCustomerId) throw new Error('Please select a customer first.');
+            await insertAsset(addCustomerId, p);
+          }
           await reload();
           setAssetFormOpen(false);
           setEditingAsset(null);

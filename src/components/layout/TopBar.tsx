@@ -114,6 +114,8 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
           placeholder="Search customers, sites, assets, alerts…"
           value={searchVal}
           onChange={e => setSearchVal(e.target.value)}
+          clearable
+          onClear={() => setSearchVal('')}
           aria-label="Search"
         />
       </form>

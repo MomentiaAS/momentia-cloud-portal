@@ -274,6 +274,8 @@ export function CustomersPage() {
           placeholder={`Filter ${entityLabelPlural.toLowerCase()}…`}
           value={query}
           onChange={e => setQuery(e.target.value)}
+          clearable
+          onClear={() => setQuery('')}
           aria-label={`Filter ${entityLabelPlural.toLowerCase()}`}
         />
         <select

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
   Laptop, Server, Network, Smartphone, Printer, Package,
-  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, FileDown,
+  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -137,6 +137,74 @@ function exportToPdf(
   setTimeout(() => { w.print(); }, 250);
 }
 
+function csvEscape(v: unknown): string {
+  const s = String(v ?? '');
+  // Escape for CSV and wrap in quotes when needed.
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadTextFile(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scopeLabel?: string) {
+  const header = [
+    'Asset',
+    'Type',
+    'Customer',
+    'Serial',
+    'Assigned To',
+    'IP Address',
+    'Status',
+    'Warranty',
+  ];
+
+  const rows = assets.map(a => {
+    const ws = warrantyStatus(a.warrantyEnd);
+    const warLabel = a.warrantyEnd
+      ? `${a.warrantyEnd}${ws === 'expired' ? ' ⚠ expired' : ws === 'soon' ? ' ⚠ soon' : ''}`
+      : '—';
+
+    const assetLabel = [a.name, a.make || a.model ? `${a.make || ''}${a.model ? ` ${a.model}` : ''}`.trim() : '']
+      .filter(Boolean)
+      .join(' — ');
+
+    return [
+      assetLabel,
+      TYPE_META[a.type]?.label ?? a.type,
+      customerMap[a.customerId] ?? '—',
+      a.serial ?? '—',
+      a.assignedTo ?? '—',
+      a.ipAddress ?? '—',
+      a.status,
+      warLabel,
+    ].map(csvEscape);
+  });
+
+  const csv = [
+    // BOM helps Excel detect UTF-8 properly
+    '\uFEFF' + header.join(','),
+    ...rows.map(r => r.join(',')),
+  ].join('\n');
+
+  const scope = scopeLabel ? `_${scopeLabel}` : '';
+  const safeScope = scope.replace(/[^a-z0-9_-]/gi, '_');
+  downloadTextFile(`assets_export${safeScope}_${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
+
+  // Optional: lightweight feedback
+  // eslint-disable-next-line no-alert
+  // window.alert('CSV export started');
+}
+
 // ── Sortable header cell ──────────────────────────────────────────────────────
 
 function SortTh({
@@ -253,6 +321,7 @@ export function AssetsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [sortKey,      setSortKey]      = useState<SortKey>('customer');
   const [sortDir,      setSortDir]      = useState<SortDir>('asc');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv'>('pdf');
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
@@ -310,20 +379,27 @@ export function AssetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
+          <select
+            value={exportFormat}
+            onChange={(e) => {
+              const fmt = e.target.value as 'pdf' | 'csv';
               const scopeLabel = customerFilter === 'All'
                 ? undefined
                 : (customerMap[customerFilter] ?? 'Customer');
-              exportToPdf(filtered, customerMap, scopeLabel);
+
+              if (fmt === 'pdf') exportToPdf(filtered, customerMap, scopeLabel);
+              else exportToCsv(filtered, customerMap, scopeLabel);
+
+              // Reset to default so selecting the same option again works.
+              setExportFormat('pdf');
             }}
             disabled={filtered.length === 0}
+            className="h-9 w-36 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+            aria-label="Export format"
           >
-            <FileDown className="size-4" />
-            Export PDF
-          </Button>
+            <option value="pdf">Export PDF</option>
+            <option value="csv">Export CSV</option>
+          </select>
           <Button variant="ghost" size="icon" onClick={reload} disabled={loading} aria-label="Refresh">
             <RefreshCw className={cn('size-4', loading && 'animate-spin')} />
           </Button>
@@ -350,7 +426,7 @@ export function AssetsPage() {
         <select
           value={customerFilter}
           onChange={e => setCustomerFilter(e.target.value)}
-          className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="h-9 w-56 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
         >
           <option value="All">All customers</option>
           {customers.map(c => (
@@ -360,7 +436,7 @@ export function AssetsPage() {
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
-          className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="h-9 w-44 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
         >
           <option value="All">All types</option>
           {ALL_TYPES.slice(1).map(t => (

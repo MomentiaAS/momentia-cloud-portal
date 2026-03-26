@@ -31,7 +31,7 @@ function readWarrantySet(): Set<string> {
 export function NotificationsPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { alerts, loading, error, reload, markResolved } = useAlerts();
+  const { alerts, loading, error, reload, markResolved, deleteNotification } = useAlerts();
   const { assets, loading: assetsLoading, error: assetsError, reload: reloadAssets } = useAllAssets();
   const { customers } = useCustomers();
   const readWarranty = readWarrantySet();
@@ -240,63 +240,163 @@ export function NotificationsPage() {
           </Card>
         )}
 
-        {!isLoading && displayedItems.map(item => {
-          const isUniFiOffline = item.kind === 'db' && item.source.startsWith('unifi-offline-');
-          return (
-          <Card
-            key={`${item.kind}-${item.id}`}
-            className="hover:shadow-card-hover"
-            onClick={isUniFiOffline ? () => navigate(`/customers/${item.customerId}?tab=network`) : undefined}
-          >
-            <CardBody className="pt-4 flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <Badge variant={item.severity} dot>{item.severity.toUpperCase()}</Badge>
-                  <span className="text-xs text-text-muted">{customerName(item.customerId)}</span>
-                  <span className="text-xs text-text-muted">· {item.source}</span>
-                  {!item.unread && <Badge variant="default">Read</Badge>}
+        {!isLoading && (
+          <>
+            {(() => {
+              const unreadItems = displayedItems.filter(i => i.unread);
+              const readItems = displayedItems.filter(i => !i.unread);
+
+              return (
+                <div className="space-y-2">
+                  {unreadItems.map(item => {
+                    const isUniFiOffline = item.kind === 'db' && item.source.startsWith('unifi-offline-');
+                    return (
+                      <Card
+                        key={`${item.kind}-${item.id}`}
+                        className="hover:shadow-card-hover"
+                        onClick={isUniFiOffline ? () => navigate(`/customers/${item.customerId}?tab=network`) : undefined}
+                      >
+                        <CardBody className="pt-4 flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <Badge variant={item.severity} dot>{item.severity.toUpperCase()}</Badge>
+                              <span className="text-xs text-text-muted">{customerName(item.customerId)}</span>
+                              <span className="text-xs text-text-muted">· {item.source}</span>
+                              {!item.unread && <Badge variant="default">Read</Badge>}
+                            </div>
+                            <p className="text-sm font-semibold text-text-primary">{item.title}</p>
+                            <p className="text-sm text-text-secondary mt-0.5 whitespace-pre-wrap">
+                              {item.kind === 'warranty' && <ShieldAlert className="size-3.5 inline mr-1" />}
+                              {item.message}
+                            </p>
+                            <p className="text-xs text-text-muted mt-1">
+                              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {item.kind === 'warranty' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/customers/${item.customerId}?tab=assets`);
+                                }}
+                                rightIcon={<ExternalLink className="size-3" />}
+                              >
+                                Open
+                              </Button>
+                            )}
+                            {item.unread && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (item.kind === 'db') await markResolved(item.id);
+                                  else markWarrantyRead(item.id);
+                                  window.dispatchEvent(new Event('notifications-updated'));
+                                }}
+                              >
+                                Mark read
+                              </Button>
+                            )}
+                            {item.kind === 'db' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await deleteNotification(item.id);
+                                    window.dispatchEvent(new Event('notifications-updated'));
+                                  } catch (err) {
+                                    window.alert(err instanceof Error ? err.message : 'Failed to delete notification');
+                                  }
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                        </CardBody>
+                      </Card>
+                    );
+                  })}
+
+                  {readItems.length > 0 && (
+                    <>
+                      <div className="pt-3 px-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Read</p>
+                      </div>
+                      {readItems.map(item => {
+                        const isUniFiOffline = item.kind === 'db' && item.source.startsWith('unifi-offline-');
+                        return (
+                          <Card
+                            key={`${item.kind}-${item.id}`}
+                            className="hover:shadow-card-hover"
+                            onClick={isUniFiOffline ? () => navigate(`/customers/${item.customerId}?tab=network`) : undefined}
+                          >
+                            <CardBody className="pt-4 flex items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <Badge variant={item.severity} dot>{item.severity.toUpperCase()}</Badge>
+                                  <span className="text-xs text-text-muted">{customerName(item.customerId)}</span>
+                                  <span className="text-xs text-text-muted">· {item.source}</span>
+                                  {!item.unread && <Badge variant="default">Read</Badge>}
+                                </div>
+                                <p className="text-sm font-semibold text-text-primary">{item.title}</p>
+                                <p className="text-sm text-text-secondary mt-0.5 whitespace-pre-wrap">
+                                  {item.kind === 'warranty' && <ShieldAlert className="size-3.5 inline mr-1" />}
+                                  {item.message}
+                                </p>
+                                <p className="text-xs text-text-muted mt-1">
+                                  {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {item.kind === 'warranty' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/customers/${item.customerId}?tab=assets`);
+                                    }}
+                                    rightIcon={<ExternalLink className="size-3" />}
+                                  >
+                                    Open
+                                  </Button>
+                                )}
+                                {item.kind === 'db' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        await deleteNotification(item.id);
+                                        window.dispatchEvent(new Event('notifications-updated'));
+                                      } catch (err) {
+                                        window.alert(err instanceof Error ? err.message : 'Failed to delete notification');
+                                      }
+                                    }}
+                                  >
+                                    Delete
+                                  </Button>
+                                )}
+                              </div>
+                            </CardBody>
+                          </Card>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
-                <p className="text-sm font-semibold text-text-primary">{item.title}</p>
-                <p className="text-sm text-text-secondary mt-0.5 whitespace-pre-wrap">
-                  {item.kind === 'warranty' && <ShieldAlert className="size-3.5 inline mr-1" />}
-                  {item.message}
-                </p>
-                <p className="text-xs text-text-muted mt-1">
-                  {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {item.kind === 'warranty' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/customers/${item.customerId}?tab=assets`);
-                    }}
-                    rightIcon={<ExternalLink className="size-3" />}
-                  >
-                    Open
-                  </Button>
-                )}
-                {item.unread && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (item.kind === 'db') await markResolved(item.id);
-                      else markWarrantyRead(item.id);
-                      window.dispatchEvent(new Event('notifications-updated'));
-                    }}
-                  >
-                    Mark read
-                  </Button>
-                )}
-              </div>
-            </CardBody>
-          </Card>
-        );})}
+              );
+            })()}
+          </>
+        )}
       </div>
     </div>
   );

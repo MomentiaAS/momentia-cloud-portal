@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchAlerts, resolveAlert } from '../lib/db';
+import { fetchAlerts, resolveAlert, deleteAlert } from '../lib/db';
 import type { Alert } from '../types';
 
 export function useAlerts(resolvedFilter?: boolean) {
@@ -26,5 +26,10 @@ export function useAlerts(resolvedFilter?: boolean) {
     setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true } : a));
   }
 
-  return { alerts, loading, error, reload: load, markResolved };
+  async function deleteNotification(id: string): Promise<void> {
+    await deleteAlert(id);
+    setAlerts(prev => prev.filter(a => a.id !== id));
+  }
+
+  return { alerts, loading, error, reload: load, markResolved, deleteNotification };
 }

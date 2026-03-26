@@ -13,6 +13,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Avatar } from '../../components/ui/Avatar';
 import { cn } from '../../components/ui/cn';
 import { useCustomerDetail } from '../../hooks/useCustomerDetail';
@@ -381,7 +382,7 @@ function LogsTab({ logs }: { logs: LogEntry[] }) {
         <div className="max-w-xs">
           <Input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
             placeholder="Filter logs…"
             clearable
             onClear={() => setSearch('')}

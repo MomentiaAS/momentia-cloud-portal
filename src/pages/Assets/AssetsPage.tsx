@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
   Laptop, Server, Network, Smartphone, Printer, Package,
-  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2,
+  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2, X,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -11,7 +11,8 @@ import { Input } from '../../components/ui/Input';
 import { cn } from '../../components/ui/cn';
 import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
-import { deleteAsset } from '../../lib/db';
+import { deleteAsset, updateAsset } from '../../lib/db';
+import { AssetForm } from './AssetForm';
 import type { Asset, AssetType } from '../../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
 
 // ── Sort ─────────────────────────────────────────────────────────────────────
 
-type SortKey = 'name' | 'type' | 'customer' | 'serial' | 'assignedTo' | 'status' | 'warrantyEnd';
+type SortKey = 'name' | 'type' | 'customer' | 'model' | 'serial' | 'assignedTo' | 'ipAddress' | 'status' | 'warrantyEnd';
 type SortDir = 'asc' | 'desc';
 
 function sortAssets(
@@ -54,8 +55,10 @@ function sortAssets(
       case 'name':       av = a.name;                           bv = b.name;                           break;
       case 'type':       av = TYPE_META[a.type]?.label ?? '';   bv = TYPE_META[b.type]?.label ?? '';   break;
       case 'customer':   av = customerMap[a.customerId] ?? '';  bv = customerMap[b.customerId] ?? '';  break;
+      case 'model':      av = a.model       ?? '';              bv = b.model       ?? '';              break;
       case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
       case 'assignedTo': av = a.assignedTo  ?? '';              bv = b.assignedTo  ?? '';              break;
+      case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
       case 'status':     av = a.status;                         bv = b.status;                         break;
       case 'warrantyEnd':av = a.warrantyEnd ?? '';              bv = b.warrantyEnd ?? '';              break;
     }
@@ -258,12 +261,13 @@ function SortTh({
 
 // ── Asset row ─────────────────────────────────────────────────────────────────
 
-function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete }: {
+function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpenDetails }: {
   asset: Asset;
   customerName: string;
   onViewCustomer: (id: string) => void;
   onEdit: (asset: Asset) => void;
   onDelete: (asset: Asset) => void;
+  onOpenDetails: (asset: Asset) => void;
 }) {
   const { icon: Icon, label: typeLabel } = TYPE_META[asset.type] ?? TYPE_META.other;
   const ws = warrantyStatus(asset.warrantyEnd);
@@ -271,7 +275,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete }: {
   return (
     <tr
       className="border-b border-border hover:bg-surface-raised/40 transition-colors cursor-pointer"
-      onClick={() => onViewCustomer(asset.customerId)}
+      onClick={() => onOpenDetails(asset)}
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-2.5">
@@ -299,9 +303,9 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete }: {
           <ExternalLink className="size-3" />
         </button>
       </td>
+      <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.assignedTo ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
       <td className="px-4 py-3">
         <span className={cn(
@@ -363,9 +367,10 @@ const COLUMNS: { label: string; key: SortKey }[] = [
   { label: 'Asset',       key: 'name'       },
   { label: 'Type',        key: 'type'       },
   { label: 'Customer',    key: 'customer'   },
+  { label: 'Model',       key: 'model'      },
   { label: 'Serial',      key: 'serial'     },
   { label: 'Assigned To', key: 'assignedTo' },
-  { label: 'IP Address',  key: 'serial'     }, // display only, not sortable — handled separately
+  { label: 'IP Address',  key: 'ipAddress'  },
   { label: 'Status',      key: 'status'     },
   { label: 'Warranty',    key: 'warrantyEnd'},
 ];
@@ -384,6 +389,9 @@ export function AssetsPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [assetFormOpen, setAssetFormOpen] = useState(false);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
@@ -413,7 +421,13 @@ export function AssetsPage() {
   }
 
   function handleEdit(asset: Asset) {
-    navigate(`/customers/${asset.customerId}?tab=assets`);
+    setEditingAsset(asset);
+    setAssetFormOpen(true);
+    setSelectedAsset(null);
+  }
+
+  function handleOpenDetails(asset: Asset) {
+    setSelectedAsset(asset);
   }
 
   const filtered = useMemo(() => {
@@ -585,23 +599,16 @@ export function AssetsPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-border bg-surface-raised/50">
-                  {(['name','type','customer','serial','assignedTo'] as SortKey[]).map((k, i) => (
+                  {(['name','type','customer','model','serial','assignedTo','ipAddress'] as SortKey[]).map((k, i) => (
                     <SortTh
                       key={k}
-                      label={['Asset','Type','Customer','Serial','Assigned To'][i]}
+                      label={['Asset','Type','Customer','Model','Serial','Assigned To','IP Address'][i]}
                       sortKey={k}
                       active={sortKey === k}
                       dir={sortDir}
                       onSort={handleSort}
                     />
                   ))}
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                    Model
-                  </th>
-                  {/* IP Address — display only */}
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                    IP Address
-                  </th>
                   {(['status','warrantyEnd'] as SortKey[]).map((k, i) => (
                     <SortTh
                       key={k}
@@ -626,6 +633,7 @@ export function AssetsPage() {
                     onViewCustomer={id => navigate(`/customers/${id}`)}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
+                    onOpenDetails={handleOpenDetails}
                   />
                 ))}
               </tbody>
@@ -636,6 +644,87 @@ export function AssetsPage() {
       {deletingId && (
         <p className="text-xs text-text-muted">Deleting asset…</p>
       )}
+
+      {/* Asset detail drawer */}
+      {selectedAsset && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedAsset(null)} />
+          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selectedAsset.name}</h3>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedAsset(null)} aria-label="Close">
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                {[
+                  ['Type', selectedAsset.type],
+                  ['Status', selectedAsset.status],
+                  ['Make', selectedAsset.make ?? '—'],
+                  ['Model', selectedAsset.model ?? '—'],
+                  ['Serial', selectedAsset.serial ?? '—'],
+                  ['Operating system', selectedAsset.os ?? '—'],
+                  ['Assigned to', selectedAsset.assignedTo ?? '—'],
+                  ['IP address', selectedAsset.ipAddress ?? '—'],
+                  ['MAC address', selectedAsset.macAddress ?? '—'],
+                  ['Location', selectedAsset.location ?? '—'],
+                  ['Purchase date', selectedAsset.purchaseDate ?? '—'],
+                  ['Warranty', selectedAsset.warrantyEnd ?? '—'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-text-muted uppercase tracking-wider">{label}</dt>
+                    <dd className="text-text-primary mt-0.5 break-words">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {selectedAsset.notes && (
+                <div>
+                  <p className="text-xs text-text-muted uppercase tracking-wider">Notes</p>
+                  <p className="text-sm text-text-primary mt-1 whitespace-pre-wrap">{selectedAsset.notes}</p>
+                </div>
+              )}
+              <div className="pt-2 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingAsset(selectedAsset);
+                    setAssetFormOpen(true);
+                    setSelectedAsset(null);
+                  }}
+                >
+                  <Pencil className="size-3.5 mr-1.5" />
+                  Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/customers/${selectedAsset.customerId}?tab=assets`)}
+                >
+                  Open customer
+                </Button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <AssetForm
+        open={assetFormOpen}
+        onClose={() => {
+          setAssetFormOpen(false);
+          setEditingAsset(null);
+        }}
+        initial={editingAsset}
+        onSave={async (p) => {
+          if (!editingAsset) return;
+          await updateAsset(editingAsset.id, p);
+          await reload();
+          setAssetFormOpen(false);
+          setEditingAsset(null);
+        }}
+      />
     </div>
   );
 }

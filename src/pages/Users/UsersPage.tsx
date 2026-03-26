@@ -335,6 +335,8 @@ function DeleteConfirmModal({ name, onConfirm, onCancel, busy }: {
 
 interface UserRowProps {
   profile:              import('../../context/AuthContext').Profile;
+  expanded:             boolean;
+  onToggleExpanded:     () => void;
   isSelf:               boolean;
   isSuperAdmin:         boolean;
   /** Superadmin or admin — may edit display names (RLS must allow). */
@@ -349,11 +351,9 @@ interface UserRowProps {
 }
 
 function UserRow({
-  profile, isSelf, isSuperAdmin, canEditUserNames, allCustomers, onRoleChange, onNameSave, onSetPassword, onDelete,
+  profile, expanded, onToggleExpanded, isSelf, isSuperAdmin, canEditUserNames, allCustomers, onRoleChange, onNameSave, onSetPassword, onDelete,
   onFetchAssignments, onSaveAssignments,
 }: UserRowProps) {
-
-  const [expanded,       setExpanded]       = useState(false);
   const [nameDraft,      setNameDraft]      = useState(profile.name ?? '');
   const [nameSaving,     setNameSaving]     = useState(false);
   const [nameSaved,      setNameSaved]      = useState(false);
@@ -490,7 +490,7 @@ function UserRow({
       {/* Collapsed row */}
       <button
         className="w-full flex items-center gap-4 px-6 py-4 hover:bg-primary-50 dark:hover:bg-primary-800/20 transition-colors text-left"
-        onClick={() => setExpanded(v => !v)}
+        onClick={onToggleExpanded}
       >
         <Avatar name={profile.name ?? profile.email} size="sm" />
         <div className="flex-1 min-w-0">
@@ -711,6 +711,7 @@ export function UsersPage() {
   const [deleteError,  setDeleteError]  = useState<string | null>(null);
   const [pageError,    setPageError]    = useState<string | null>(null);
   const [exportOpen, setExportOpen]     = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const exportRef = useRef<HTMLDivElement | null>(null);
 
   const isSuperAdmin = currentProfile?.role === 'superadmin';
@@ -882,6 +883,8 @@ export function UsersPage() {
                 <UserRow
                   key={p.id}
                   profile={p}
+                  expanded={expandedUserId === p.id}
+                  onToggleExpanded={() => setExpandedUserId(prev => (prev === p.id ? null : p.id))}
                   isSelf={p.id === currentProfile?.id}
                   isSuperAdmin={isSuperAdmin}
                   canEditUserNames={canEditUserNames}

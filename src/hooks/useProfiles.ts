@@ -156,10 +156,34 @@ export function useProfiles() {
   }
 
   async function deleteProfile(id: string): Promise<void> {
-    // Removes the profile row; the user's auth.users entry remains but the
-    // app treats a missing profile as an unauthorised session and signs them out.
-    const { error: err } = await supabase.from('profiles').delete().eq('id', id);
-    if (err) throw new Error(err.message);
+    let { data: sessionData } = await supabase.auth.getSession();
+    let accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) throw new Error(`Authentication refresh failed: ${refreshErr.message}`);
+      accessToken = refreshed.session?.access_token;
+    }
+    if (!accessToken) {
+      throw new Error('Authentication session is missing. Please sign out and sign in again.');
+    }
+
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: id }),
+      },
+    );
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    if (!res.ok) {
+      throw new Error(body.error || `User deletion failed (HTTP ${res.status}).`);
+    }
+
     setProfiles(prev => prev.filter(p => p.id !== id));
   }
 

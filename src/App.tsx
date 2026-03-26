@@ -5,6 +5,7 @@ import { AuthProvider, useAuth }   from './context/AuthContext';
 import { AppProvider }   from './context/AppContext';
 import { AppShell }      from './components/layout/AppShell';
 import { LoginPage }          from './pages/Auth/LoginPage';
+import { ResetPasswordPage }  from './pages/Auth/ResetPasswordPage';
 import { DashboardPage }      from './pages/Dashboard/DashboardPage';
 import { CustomersPage }       from './pages/Customers/CustomersPage';
 import { CustomerDetailPage }  from './pages/Customers/CustomerDetailPage';
@@ -105,6 +106,7 @@ function AppRouter() {
           </PublicRoute>
         }
       />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/*"
         element={

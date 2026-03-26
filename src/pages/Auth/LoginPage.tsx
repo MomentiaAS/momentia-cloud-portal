@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Sun, Moon, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Sun, Moon, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../components/ui/cn';
 
 export function LoginPage() {
   const { signIn } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [searchParams] = useSearchParams();
+  const resetSent = searchParams.get('reset') === 'sent';
 
   const [email,       setEmail]       = useState('');
   const [password,    setPassword]    = useState('');
@@ -67,6 +70,14 @@ export function LoginPage() {
 
           {/* Form card */}
           <div className="bg-surface-raised border border-border rounded-card shadow-card p-8 space-y-5">
+            {resetSent && (
+              <div className="flex items-start gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2.5">
+                <CheckCircle2 className="size-4 text-emerald-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  Password reset email sent. Check your inbox.
+                </p>
+              </div>
+            )}
             {error && (
               <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2.5">
                 <AlertCircle className="size-4 text-red-500 mt-0.5 shrink-0" />
@@ -120,6 +131,11 @@ export function LoginPage() {
                   >
                     {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
+                </div>
+                <div className="text-right">
+                  <Link to="/reset-password" className="text-xs text-accent hover:underline">
+                    Forgot password?
+                  </Link>
                 </div>
               </div>
 

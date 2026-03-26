@@ -37,25 +37,16 @@ export function CustomerRow({ customer: c, onEdit, onView, archived }: CustomerR
   return (
     <tr
       className={cn(
-        'border-b border-border transition-colors',
+        'border-b border-border transition-colors cursor-pointer',
         archived
           ? 'opacity-50 hover:opacity-70'
           : 'hover:bg-primary-50/60 dark:hover:bg-primary-800/20',
       )}
+      onClick={() => navigate(`/customers/${c.id}`)}
     >
-      {/* Name — clicking navigates to customer detail */}
+      {/* Name */}
       <td className="px-4 py-3">
-        <button
-          onClick={() => navigate(`/customers/${c.id}`)}
-          className="text-left group"
-        >
-          <p className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">{c.name}</p>
-          {c.orgNumber && (
-            <p className="text-xs text-text-muted">
-              {`Org.nr ${c.orgNumber}`}
-            </p>
-          )}
-        </button>
+        <p className="text-sm font-medium text-text-primary">{c.name}</p>
       </td>
 
       {/* Health */}
@@ -94,22 +85,30 @@ export function CustomerRow({ customer: c, onEdit, onView, archived }: CustomerR
       {/* Actions */}
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onView(c)} aria-label="View">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onView(c); }} aria-label="View">
             <Eye className="size-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onEdit(c)} aria-label="Edit">
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(c); }} aria-label="Edit">
             <Pencil className="size-3.5" />
           </Button>
           <div ref={menuRef} className="relative">
-            <Button variant="ghost" size="icon" onClick={() => setMenuOpen(v => !v)} aria-label="More">
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} aria-label="More">
               <MoreHorizontal className="size-3.5" />
             </Button>
             {menuOpen && (
               <div className="absolute right-0 mt-1 w-36 bg-surface-raised border border-border rounded-lg shadow-popover z-10 py-1">
-                <button className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40">
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                >
                   Archive
                 </button>
-                <button className="w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
                   Delete
                 </button>
               </div>

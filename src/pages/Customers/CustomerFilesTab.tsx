@@ -58,6 +58,7 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
   const [folderId, setFolderId] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const items = useMemo(
@@ -65,14 +66,21 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
     [nodes, folderId],
   );
 
+  const selectedItems = useMemo(
+    () => items.filter(i => selectedIds.includes(i.id)),
+    [items, selectedIds],
+  );
+
   const crumbs = useMemo(() => buildBreadcrumb(nodes, folderId), [nodes, folderId]);
 
   const openFolder = useCallback((id: string) => {
     setFolderId(id);
+    setSelectedIds([]);
   }, []);
 
   const goCrumb = useCallback((id: string | null) => {
     setFolderId(id);
+    setSelectedIds([]);
   }, []);
 
   async function handleNewFolder() {
@@ -117,6 +125,45 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Delete failed');
     }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  }
+
+  function toggleSelectAllCurrent() {
+    const allIds = items.map(i => i.id);
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : allIds);
+  }
+
+  async function handleBulkDownload() {
+    const files = selectedItems.filter(i => i.kind === 'file' && i.storagePath);
+    if (files.length === 0) {
+      window.alert('Select at least one file to download.');
+      return;
+    }
+    for (const f of files) {
+      try {
+        const url = await getDownloadUrl(f.storagePath!);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch (e) {
+        window.alert(`${f.name}: ${e instanceof Error ? e.message : 'Download failed'}`);
+      }
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedItems.length === 0) return;
+    if (!window.confirm(`Delete ${selectedItems.length} selected item(s)?`)) return;
+    for (const item of selectedItems) {
+      try {
+        await removeNode(item.id);
+      } catch (e) {
+        window.alert(`${item.name}: ${e instanceof Error ? e.message : 'Delete failed'}`);
+      }
+    }
+    setSelectedIds([]);
   }
 
   if (loading) {
@@ -206,6 +253,21 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
         </div>
       </div>
 
+      {canEdit && selectedIds.length > 0 && (
+        <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+          <span className="text-xs text-text-muted">{selectedIds.length} selected</span>
+          <Button size="sm" variant="outline" onClick={() => void handleBulkDownload()}>
+            <Download className="size-3.5 mr-1" /> Download selected
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void handleBulkDelete()} className="text-red-500 border-red-200 dark:border-red-900">
+            <Trash2 className="size-3.5 mr-1" /> Delete selected
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds([])}>
+            Clear
+          </Button>
+        </div>
+      )}
+
       {canEdit && uploadOpen && (
         <div className="px-3 py-3 border-b border-border">
           <button
@@ -252,6 +314,15 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
               key={node.id}
               className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface/80"
             >
+              {canEdit && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(node.id)}
+                  onChange={() => toggleSelected(node.id)}
+                  className="accent-accent size-3.5 shrink-0"
+                  aria-label={`Select ${node.name}`}
+                />
+              )}
               {node.kind === 'folder' ? (
                 <button
                   type="button"
@@ -294,6 +365,18 @@ export function CustomerFilesTab({ customerId, canEdit }: { customerId: string; 
           ))
         )}
       </div>
+      {canEdit && items.length > 0 && (
+        <div className="px-3 py-2 border-t border-border flex items-center justify-between text-xs text-text-muted">
+          <button
+            type="button"
+            onClick={toggleSelectAllCurrent}
+            className="text-accent hover:underline"
+          >
+            {items.every(i => selectedIds.includes(i.id)) ? 'Unselect all' : 'Select all'}
+          </button>
+          <span>{items.length} item(s)</span>
+        </div>
+      )}
     </div>
   );
 }

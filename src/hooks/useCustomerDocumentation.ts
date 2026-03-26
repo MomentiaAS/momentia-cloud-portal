@@ -51,6 +51,23 @@ export function useCustomerDocumentation(customerId: string) {
     setSections(prev => prev.filter(s => s.id !== id));
   }
 
+  async function reorderSections(nextIdsInOrder: string[]): Promise<void> {
+    const byId = new Map(sections.map(s => [s.id, s]));
+    const next = nextIdsInOrder
+      .map(id => byId.get(id))
+      .filter((s): s is CustomerDocSection => !!s)
+      .map((s, idx) => ({ ...s, sortOrder: idx }));
+
+    // Persist each section's new sort order.
+    await Promise.all(next.map(s => updateDocSection(s.id, {
+      title: s.title,
+      body: s.body ?? '',
+      sortOrder: s.sortOrder,
+    })));
+
+    setSections(next.sort(compareSections));
+  }
+
   return {
     sections,
     loading,
@@ -59,6 +76,7 @@ export function useCustomerDocumentation(customerId: string) {
     addSection,
     saveSection,
     removeSection,
+    reorderSections,
   };
 }
 

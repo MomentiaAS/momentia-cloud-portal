@@ -46,6 +46,7 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     addSection,
     saveSection,
     removeSection,
+    reorderSections,
     reload,
   } = useCustomerDocumentation(customerId);
 
@@ -58,6 +59,8 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
   const [saveBusy, setSaveBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
+  const [dragSectionId, setDragSectionId] = useState<string | null>(null);
+  const [reorderBusy, setReorderBusy] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const shouldFocusTitleRef = useRef(false);
 
@@ -185,6 +188,27 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
     }
   }
 
+  async function handleDropOnSection(targetId: string) {
+    if (!dragSectionId || dragSectionId === targetId || reorderBusy) return;
+    const from = sections.findIndex(s => s.id === dragSectionId);
+    const to = sections.findIndex(s => s.id === targetId);
+    if (from < 0 || to < 0) return;
+
+    const reordered = [...sections];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+
+    setReorderBusy(true);
+    try {
+      await reorderSections(reordered.map(s => s.id));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Could not reorder sections');
+    } finally {
+      setDragSectionId(null);
+      setReorderBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[280px] animate-pulse">
@@ -236,12 +260,26 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
               <button
                 key={s.id}
                 type="button"
+                draggable={canEdit && !reorderBusy}
+                onDragStart={() => setDragSectionId(s.id)}
+                onDragEnd={() => setDragSectionId(null)}
+                onDragOver={(e) => {
+                  if (!canEdit) return;
+                  e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  if (!canEdit) return;
+                  e.preventDefault();
+                  void handleDropOnSection(s.id);
+                }}
                 onClick={() => trySelect(s.id)}
                 className={cn(
                   'w-full flex items-center gap-2 text-left text-sm px-2.5 py-2 rounded-lg transition-colors',
                   s.id === selectedId
                     ? 'bg-accent/15 text-text-primary font-medium'
                     : 'text-text-secondary hover:bg-surface-hover',
+                  canEdit && 'cursor-grab active:cursor-grabbing',
+                  dragSectionId === s.id && 'opacity-60',
                 )}
               >
                 <FileText className="size-3.5 shrink-0 text-text-muted" />

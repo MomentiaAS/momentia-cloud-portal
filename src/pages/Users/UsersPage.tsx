@@ -11,6 +11,8 @@ import { useProfiles, type CreateUserPayload } from '../../hooks/useProfiles';
 import { useCustomers } from '../../hooks/useCustomers';
 import type { UserRole } from '../../context/AuthContext';
 import { useAuth } from '../../context/AuthContext';
+import { uploadAvatarForUser, removeAvatarForUser } from '../../lib/avatars';
+import { supabase } from '../../lib/supabase';
 
 // ── Role metadata ────────────────────────────────────────────────────────────
 
@@ -386,6 +388,8 @@ function UserRow({
   const [passwordBusy,   setPasswordBusy]   = useState(false);
   const [passwordSaved,  setPasswordSaved]  = useState(false);
   const [passwordError,  setPasswordError]  = useState<string | null>(null);
+  const [avatarBusy,    setAvatarBusy]     = useState(false);
+  const [avatarError,   setAvatarError]    = useState<string | null>(null);
   const assignMenuRef = useRef<HTMLDivElement | null>(null);
 
   const needsCustomerScope = profile.role === 'technician' || profile.role === 'viewer';
@@ -480,6 +484,46 @@ function UserRow({
     }
   }
 
+  async function handleAvatarUpload(file: File) {
+    if (!isSuperAdmin) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      const { publicUrl } = await uploadAvatarForUser({ userId: profile.id, file });
+      const urlWithBust = `${publicUrl}${publicUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: urlWithBust })
+        .eq('id', profile.id);
+      if (error) throw new Error(error.message);
+      // Parent will re-fetch profiles periodically; easiest is a full refresh.
+      window.dispatchEvent(new Event('profile-updated'));
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : 'Failed to upload photo.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!isSuperAdmin) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      await removeAvatarForUser(profile.id);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('id', profile.id);
+      if (error) throw new Error(error.message);
+      window.dispatchEvent(new Event('profile-updated'));
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : 'Failed to remove photo.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
   const nameDraftTrimmed = nameDraft.trim();
   const currentNameTrimmed = (profile.name ?? '').trim();
   const canSaveName = canEditUserNames && !!nameDraftTrimmed && nameDraftTrimmed !== currentNameTrimmed;
@@ -508,7 +552,7 @@ function UserRow({
         className="w-full flex items-center gap-4 px-6 py-4 hover:bg-primary-50 dark:hover:bg-primary-800/20 transition-colors text-left"
         onClick={onToggleExpanded}
       >
-        <Avatar name={profile.name ?? profile.email} size="sm" />
+        <Avatar name={profile.name ?? profile.email} size="sm" src={profile.avatar_url ?? null} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-text-primary truncate">{profile.name ?? '—'}</p>
@@ -575,6 +619,45 @@ function UserRow({
               )}
             </div>
           </div>
+
+          {/* Profile photo (superadmin) */}
+          {isSuperAdmin && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Profile photo</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className={cn(
+                  'inline-flex items-center gap-2 text-xs font-medium text-accent hover:text-accent/80 cursor-pointer',
+                  avatarBusy && 'opacity-60 pointer-events-none',
+                )}>
+                  Upload photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleAvatarUpload(f);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+                {profile.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={() => void handleAvatarRemove()}
+                    className={cn(
+                      'text-xs font-medium text-red-500 hover:text-red-600',
+                      avatarBusy && 'opacity-60 pointer-events-none',
+                    )}
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
+              {avatarError && <p className="text-xs text-red-500">{avatarError}</p>}
+              <p className="text-xs text-text-muted">Superadmin can change photos for any user.</p>
+            </div>
+          )}
 
           {isSuperAdmin && (
             <div className="space-y-2">

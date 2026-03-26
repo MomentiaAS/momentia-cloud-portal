@@ -177,7 +177,7 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
           aria-haspopup="true"
           aria-expanded={showUserMenu}
         >
-          <Avatar name={displayName} size="sm" />
+          <Avatar name={displayName} size="sm" src={profile?.avatar_url ?? null} />
           <span className="hidden md:block text-sm font-medium text-text-primary">{displayName}</span>
           <ChevronDown className="hidden md:block size-3 text-text-muted" />
         </button>

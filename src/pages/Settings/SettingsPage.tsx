@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Save, MapPin, Loader2, X, Clock } from 'lucide-react';
+import { Save, MapPin, Loader2, X, Clock, Upload, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
@@ -9,6 +9,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useApp, type WeatherLocation } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { removeAvatarForUser, uploadAvatarForUser } from '../../lib/avatars';
 import { searchCities, type GeoSuggestion } from '../../hooks/useWeather';
 
 // ── Shared input style ────────────────────────────────────────────────────────
@@ -314,6 +315,8 @@ export function SettingsPage() {
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileBusy,  setProfileBusy]  = useState(false);
+  const [avatarBusy,   setAvatarBusy]   = useState(false);
+  const [avatarError,  setAvatarError]  = useState<string | null>(null);
   const [emailDraft,   setEmailDraft]   = useState(profile?.email ?? '');
   const [emailBusy,    setEmailBusy]    = useState(false);
   const [emailSaved,   setEmailSaved]   = useState(false);
@@ -371,6 +374,46 @@ export function SettingsPage() {
       setTimeout(() => setProfileSaved(false), 2000);
     }
     setProfileBusy(false);
+  }
+
+  async function handleAvatarUpload(file: File) {
+    if (!profile) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      const { publicUrl } = await uploadAvatarForUser({ userId: profile.id, file });
+      // Cache-bust for immediate UI refresh
+      const urlWithBust = `${publicUrl}${publicUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: urlWithBust })
+        .eq('id', profile.id);
+      if (error) throw new Error(error.message);
+      window.dispatchEvent(new Event('profile-updated'));
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : 'Failed to upload photo.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleAvatarRemove() {
+    if (!profile) return;
+    setAvatarBusy(true);
+    setAvatarError(null);
+    try {
+      await removeAvatarForUser(profile.id);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('id', profile.id);
+      if (error) throw new Error(error.message);
+      window.dispatchEvent(new Event('profile-updated'));
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : 'Failed to remove photo.');
+    } finally {
+      setAvatarBusy(false);
+    }
   }
 
   async function saveEmail() {
@@ -460,10 +503,45 @@ export function SettingsPage() {
         <CardHeader title="Profile" subtitle="Your personal details" />
         <CardBody>
           <div className="flex items-center gap-4 mb-5">
-            <Avatar name={displayName} size="lg" />
+            <Avatar name={displayName} size="lg" src={profile?.avatar_url ?? null} />
             <div>
               <p className="text-sm font-semibold text-text-primary">{displayName}</p>
               <p className="text-xs text-text-muted">{roleLabel}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <label className={cn(
+                  'inline-flex items-center gap-1.5 text-xs font-medium',
+                  'text-accent hover:text-accent/80 cursor-pointer',
+                  avatarBusy && 'opacity-60 pointer-events-none',
+                )}>
+                  <Upload className="size-3.5" />
+                  Upload photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) void handleAvatarUpload(f);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+                {profile?.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={() => void handleAvatarRemove()}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 text-xs font-medium',
+                      'text-red-500 hover:text-red-600',
+                      avatarBusy && 'opacity-60 pointer-events-none',
+                    )}
+                  >
+                    <Trash2 className="size-3.5" />
+                    Remove
+                  </button>
+                )}
+              </div>
+              {avatarError && <p className="mt-1 text-xs text-red-500">{avatarError}</p>}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -9,6 +9,7 @@ export interface Profile {
   email:      string;
   name:       string | null;
   phone?:     string | null;
+  avatar_url?: string | null;
   role:       UserRole;
   created_at: string;
 }
@@ -58,6 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProfile(row);
   }, []);
+
+  // Allow any page to request a profile refresh after updating profile fields (e.g. avatar_url).
+  useEffect(() => {
+    function onProfileUpdated() {
+      const uid = currentUserIdRef.current;
+      if (!uid) return;
+      void loadProfile(uid);
+    }
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated);
+  }, [loadProfile]);
 
   useEffect(() => {
     // onAuthStateChange fires INITIAL_SESSION immediately on subscribe,

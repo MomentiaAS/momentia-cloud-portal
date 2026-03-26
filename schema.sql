@@ -80,6 +80,7 @@ create table if not exists public.profiles (
   email      text not null,
   name       text,
   phone      text,
+  avatar_url text,
   role       text not null default 'technician'
                check (role in ('superadmin', 'admin', 'technician', 'viewer')),
   created_at timestamptz not null default now()
@@ -210,6 +211,48 @@ alter table public.customers add column if not exists org_nr text;
 
 -- v6 → v7: add postcode
 alter table public.customers add column if not exists postcode text;
+
+-- v7 → v8: profile avatar support (and Storage bucket/policies)
+alter table public.profiles add column if not exists avatar_url text;
+
+-- Storage bucket: avatars (public read)
+do $$ begin
+  if not exists (select 1 from storage.buckets where id = 'avatars') then
+    insert into storage.buckets (id, name, public)
+    values ('avatars', 'avatars', true);
+  end if;
+end $$;
+
+-- Storage RLS policies for avatars bucket
+do $$ begin
+  -- Public read (anyone signed in can also read, but bucket is public anyway)
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Avatar images are readable') then
+    create policy "Avatar images are readable" on storage.objects
+      for select using (bucket_id = 'avatars');
+  end if;
+
+  -- Users may write only to their own folder: <uid>/...
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Users manage own avatar images') then
+    create policy "Users manage own avatar images" on storage.objects
+      for all
+      using (
+        bucket_id = 'avatars'
+        and (storage.foldername(name))[1] = auth.uid()::text
+      )
+      with check (
+        bucket_id = 'avatars'
+        and (storage.foldername(name))[1] = auth.uid()::text
+      );
+  end if;
+
+  -- Superadmin may manage any avatar image (upload/replace/remove for others)
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Superadmin manage avatar images') then
+    create policy "Superadmin manage avatar images" on storage.objects
+      for all
+      using (bucket_id = 'avatars' and public.current_user_role() = 'superadmin')
+      with check (bucket_id = 'avatars' and public.current_user_role() = 'superadmin');
+  end if;
+end $$;
 
 -- v1 → v2: customers schema changes
 alter table public.customers add column if not exists state text;

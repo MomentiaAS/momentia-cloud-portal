@@ -678,7 +678,7 @@ function UserRow({
                       className={inputClass}
                       value={passwordDraft}
                       onChange={e => { setPasswordDraft(e.target.value); setPasswordSaved(false); setPasswordError(null); }}
-                      placeholder="New temporary password"
+                      placeholder="New password"
                     />
                     <Button
                       variant="primary"
@@ -686,7 +686,7 @@ function UserRow({
                       onClick={() => void handlePasswordSave()}
                       disabled={passwordBusy || passwordDraft.trim().length < 8}
                     >
-                      {passwordBusy ? 'Saving…' : 'Set password'}
+                      {passwordBusy ? 'Saving…' : 'Set'}
                     </Button>
                   </div>
                   {passwordSaved && <p className="text-xs text-emerald-500">Password updated.</p>}

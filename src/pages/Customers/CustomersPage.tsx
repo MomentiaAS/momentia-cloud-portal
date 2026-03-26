@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Plus, Search, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, Search, RefreshCw, AlertCircle, ChevronDown } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { SkeletonCard } from '../../components/ui/Skeleton';
@@ -93,12 +93,38 @@ function exportCustomersToPdf(customers: Customer[]) {
 </body>
 </html>`;
 
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => { w.print(); }, 250);
+  // Use an iframe to avoid popup blockers (select onchange can be blocked).
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  const win = iframe.contentWindow;
+  if (!doc || !win) {
+    iframe.remove();
+    window.alert('PDF export blocked by the browser.');
+    return;
+  }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      // Cleanup after printing dialog is triggered.
+      setTimeout(() => iframe.remove(), 500);
+    }
+  }, 150);
 }
 
 function sortCustomers(customers: Customer[], sortKey: CustomerSortKey, sortDir: CustomerSortDir): Customer[] {
@@ -124,9 +150,10 @@ export function CustomersPage() {
   const [groupFilter, setGroupFilter]  = useState<'all' | 'active' | 'potential' | 'archived'>('all');
   const [formOpen, setFormOpen]        = useState(false);
   const [editing, setEditing]          = useState<Customer | null>(null);
-  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv'>('pdf');
+  const [exportOpen, setExportOpen] = useState(false);
   const [sortKey, setSortKey] = useState<CustomerSortKey>('name');
   const [sortDir, setSortDir] = useState<CustomerSortDir>('asc');
+  const exportRef = useRef<HTMLDivElement | null>(null);
 
   const { profile } = useAuth();
   const isRestricted = profile?.role === 'viewer' || profile?.role === 'technician';
@@ -164,6 +191,16 @@ export function CustomersPage() {
     else { setSortKey(next); setSortDir('asc'); }
   }
 
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
   function openEdit(c: Customer) { setEditing(c); setFormOpen(true); }
   function openAdd()              { setEditing(null); setFormOpen(true); }
   function handleView(c: Customer) {
@@ -184,21 +221,41 @@ export function CustomersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={exportFormat}
-            onChange={(e) => {
-              const fmt = e.target.value as 'pdf' | 'csv';
-              if (fmt === 'pdf') exportCustomersToPdf(exportList);
-              else exportCustomersToCsv(exportList);
-              setExportFormat('pdf');
-            }}
-            disabled={loading || exportList.length === 0}
-            className="h-9 w-36 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            aria-label="Export customers"
-          >
-            <option value="pdf">Export PDF</option>
-            <option value="csv">Export CSV</option>
-          </select>
+          <div ref={exportRef} className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(v => !v)}
+              disabled={loading || exportList.length === 0}
+              rightIcon={<ChevronDown className="size-3.5" />}
+            >
+              Export
+            </Button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => {
+                    exportCustomersToPdf(exportList);
+                    setExportOpen(false);
+                  }}
+                >
+                  Export to PDF
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => {
+                    exportCustomersToCsv(exportList);
+                    setExportOpen(false);
+                  }}
+                >
+                  Export to CSV
+                </button>
+              </div>
+            )}
+          </div>
           <Button variant="ghost" size="icon" onClick={reload} aria-label="Refresh" disabled={loading}>
             <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>

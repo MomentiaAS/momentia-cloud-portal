@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
@@ -129,12 +129,36 @@ function exportToPdf(
 </body>
 </html>`;
 
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => { w.print(); }, 250);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  const win = iframe.contentWindow;
+  if (!doc || !win) {
+    iframe.remove();
+    window.alert('PDF export blocked by the browser.');
+    return;
+  }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      setTimeout(() => iframe.remove(), 500);
+    }
+  }, 150);
 }
 
 function csvEscape(v: unknown): string {
@@ -321,7 +345,8 @@ export function AssetsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [sortKey,      setSortKey]      = useState<SortKey>('customer');
   const [sortDir,      setSortDir]      = useState<SortDir>('asc');
-  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv'>('pdf');
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement | null>(null);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
@@ -363,6 +388,16 @@ export function AssetsPage() {
     return ws === 'expired' || ws === 'soon';
   }).length;
 
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -379,27 +414,47 @@ export function AssetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={exportFormat}
-            onChange={(e) => {
-              const fmt = e.target.value as 'pdf' | 'csv';
-              const scopeLabel = customerFilter === 'All'
-                ? undefined
-                : (customerMap[customerFilter] ?? 'Customer');
-
-              if (fmt === 'pdf') exportToPdf(filtered, customerMap, scopeLabel);
-              else exportToCsv(filtered, customerMap, scopeLabel);
-
-              // Reset to default so selecting the same option again works.
-              setExportFormat('pdf');
-            }}
-            disabled={filtered.length === 0}
-            className="h-9 w-36 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            aria-label="Export format"
-          >
-            <option value="pdf">Export PDF</option>
-            <option value="csv">Export CSV</option>
-          </select>
+          <div ref={exportRef} className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(v => !v)}
+              disabled={filtered.length === 0}
+              rightIcon={<ChevronDown className="size-3.5" />}
+            >
+              Export
+            </Button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => {
+                    const scopeLabel = customerFilter === 'All'
+                      ? undefined
+                      : (customerMap[customerFilter] ?? 'Customer');
+                    exportToPdf(filtered, customerMap, scopeLabel);
+                    setExportOpen(false);
+                  }}
+                >
+                  Export to PDF
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => {
+                    const scopeLabel = customerFilter === 'All'
+                      ? undefined
+                      : (customerMap[customerFilter] ?? 'Customer');
+                    exportToCsv(filtered, customerMap, scopeLabel);
+                    setExportOpen(false);
+                  }}
+                >
+                  Export to CSV
+                </button>
+              </div>
+            )}
+          </div>
           <Button variant="ghost" size="icon" onClick={reload} disabled={loading} aria-label="Refresh">
             <RefreshCw className={cn('size-4', loading && 'animate-spin')} />
           </Button>

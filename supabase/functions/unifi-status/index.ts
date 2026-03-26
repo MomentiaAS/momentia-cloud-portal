@@ -503,6 +503,7 @@ serve(async (req) => {
     // Edge due to DNS restrictions, hence the fallback to /v1/hosts below).
     let devicesRaw: AnyObj[] = [];
     let clientsRaw: AnyObj[] = [];
+    let inventorySource: 'proxy' | 'hosts_fallback' | 'none' = 'none';
 
     try {
       const deviceResponses = await Promise.allSettled([
@@ -518,6 +519,7 @@ serve(async (req) => {
         if (c.status !== 'fulfilled') continue;
         devicesRaw.push(...collectArrayCandidates(c.value as AnyObj));
       }
+      if (devicesRaw.length > 0) inventorySource = 'proxy';
     } catch { /* non-fatal */ }
 
     try {
@@ -555,6 +557,7 @@ serve(async (req) => {
 
       if (devicesRaw.length === 0) {
         devicesRaw = hostsForInventory.filter(h => !isProbablyClientHost(h));
+        if (devicesRaw.length > 0) inventorySource = 'hosts_fallback';
       }
       if (clientsRaw.length === 0) {
         clientsRaw = hostsForInventory.filter(h => isProbablyClientHost(h));
@@ -583,7 +586,7 @@ serve(async (req) => {
       state: d?.reportedState?.state ?? d?.state ?? d?.status ?? null,
     })).slice(0, 200);
 
-    return json({ site, host, infraOfflineDevices, devices, clients });
+    return json({ site, host, infraOfflineDevices, devices, clients, inventorySource });
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -671,6 +671,8 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
 
   const devices = status?.devices ?? [];
   const clients = status?.clients ?? [];
+  const inventorySource = status?.inventorySource ?? 'none';
+  const inventoryLimited = inventorySource === 'hosts_fallback';
 
   const sortedDevices = [...devices].sort((a, b) => Number(isOfflineState(b.state)) - Number(isOfflineState(a.state)));
   const sortedClients = [...clients].sort((a, b) => Number(isOfflineState(b.state)) - Number(isOfflineState(a.state)));
@@ -750,6 +752,9 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
               {offlineDevices > 0 && (
                 <p className="text-xs text-red-500">{offlineDevices} offline</p>
               )}
+              {inventoryLimited && totalDevices != null && devices.length < totalDevices && (
+                <p className="text-xs text-text-muted">{devices.length} / {totalDevices} listed</p>
+              )}
             </div>
           </button>
 
@@ -791,6 +796,11 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+              {totalDevices != null && devices.length < totalDevices && (
+                <div className="rounded-lg border border-amber-300/50 bg-amber-50/40 dark:bg-amber-900/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  Showing {devices.length} discovered device{devices.length !== 1 ? 's' : ''} of {totalDevices} total from UniFi statistics.
+                </div>
+              )}
               {sortedDevices.length === 0 ? (
                 <p className="text-sm text-text-muted">No device inventory returned.</p>
               ) : (

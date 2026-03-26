@@ -109,6 +109,7 @@ export interface UnifiStatus {
   // Best-effort inventory for UI drawers.
   devices?: UnifiDevice[];
   clients?: UnifiClient[];
+  inventorySource?: 'proxy' | 'hosts_fallback' | 'none';
 }
 
 export interface UnifiSiteListItem {

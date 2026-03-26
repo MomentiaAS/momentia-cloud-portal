@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase';
 
 const DEFAULT: CustomerFormPayload = {
   name: '', status: 'active', tier: 'basic',
-  domain: '', orgNumber: '', address: '', state: '', assignedTech: '',
+  domain: '', orgNumber: '', address: '', postcode: '', state: '', assignedTech: '',
   contactName: '', contactEmail: '', contactPhone: '', contactRole: '',
   secContactName: '', secContactEmail: '', secContactPhone: '', secContactRole: '',
   notes: '',
@@ -76,6 +76,7 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
       domain:         initial.domain ?? '',
       orgNumber:      initial.orgNumber ?? '',
       address:        initial.address ?? '',
+      postcode:       initial.postcode ?? '',
       state:          initial.state ?? '',
       assignedTech:   initial.assignedTech,
       contactName:    initial.primaryContact.name,
@@ -118,6 +119,7 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
       domain:         initial.domain ?? '',
       orgNumber:      initial.orgNumber ?? '',
       address:        initial.address ?? '',
+      postcode:       initial.postcode ?? '',
       state:          initial.state ?? '',
       assignedTech:   initial.assignedTech,
       contactName:    initial.primaryContact.name,
@@ -246,7 +248,12 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
               onChange={e => set('address', e.target.value)}
             />
             <Input
-              label="State"
+              label="Postcode"
+              value={form.postcode}
+              onChange={e => set('postcode', e.target.value)}
+            />
+            <Input
+              label="City"
               value={form.state}
               onChange={e => set('state', e.target.value)}
             />

@@ -21,7 +21,7 @@ type DbCustomer = {
   id: string; name: string; status: string; health: string; tier: string;
   open_alerts: number; last_sync: string | null; assigned_tech: string | null;
   primary_contact: object; billing_contact: object | null;
-  domain: string | null; org_nr: string | null; address: string | null; state: string | null;
+  domain: string | null; org_nr: string | null; address: string | null; postcode: string | null; state: string | null;
   notes: string | null; integrations: object; unifi_site_id: string | null;
   created_at: string;
 };
@@ -83,6 +83,7 @@ function toCustomer(r: DbCustomer): Customer {
     domain:         r.domain   ?? undefined,
     orgNumber:      r.org_nr   ?? undefined,
     address:        r.address  ?? undefined,
+    postcode:       r.postcode ?? undefined,
     state:          r.state    ?? undefined,
     notes:          r.notes    ?? undefined,
     integrations:   r.integrations as Customer['integrations'],
@@ -156,7 +157,7 @@ export async function fetchCustomers(): Promise<Customer[]> {
 
 export async function insertCustomer(payload: {
   name: string; status: string; tier: string; domain?: string; orgNumber?: string;
-  address?: string; state?: string; assignedTech?: string; notes?: string;
+  address?: string; postcode?: string; state?: string; assignedTech?: string; notes?: string;
   primaryContact: object; secondaryContact?: object; integrations: object;
   unifiSiteId?: string;
 }): Promise<Customer> {
@@ -169,6 +170,7 @@ export async function insertCustomer(payload: {
       domain:          payload.domain          || null,
       org_nr:          payload.orgNumber       || null,
       address:         payload.address         || null,
+      postcode:        payload.postcode        || null,
       state:           payload.state           || null,
       assigned_tech:   payload.assignedTech    || null,
       notes:           payload.notes           || null,
@@ -187,7 +189,7 @@ export async function insertCustomer(payload: {
 
 export async function updateCustomer(id: string, payload: {
   name?: string; status?: string; tier?: string; domain?: string; orgNumber?: string;
-  address?: string; state?: string; assignedTech?: string; notes?: string;
+  address?: string; postcode?: string; state?: string; assignedTech?: string; notes?: string;
   primaryContact?: object; secondaryContact?: object | null; integrations?: object;
   unifiSiteId?: string | null; health?: string;
 }): Promise<Customer> {
@@ -200,6 +202,7 @@ export async function updateCustomer(id: string, payload: {
       ...(payload.domain          != null && { domain:         payload.domain || null }),
       ...(payload.orgNumber       != null && { org_nr:         payload.orgNumber || null }),
       ...(payload.address          != null && { address:         payload.address || null }),
+      ...(payload.postcode         != null && { postcode:        payload.postcode || null }),
       ...(payload.state            != null && { state:           payload.state || null }),
       ...(payload.assignedTech     != null && { assigned_tech:   payload.assignedTech || null }),
       ...(payload.notes            != null && { notes:           payload.notes || null }),

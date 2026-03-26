@@ -207,6 +207,9 @@ alter table public.customers add column if not exists unifi_site_id text;
 -- v5 → v6: add organisation number
 alter table public.customers add column if not exists org_nr text;
 
+-- v6 → v7: add postcode
+alter table public.customers add column if not exists postcode text;
+
 -- v1 → v2: customers schema changes
 alter table public.customers add column if not exists state text;
 alter table public.customers drop constraint if exists customers_tier_check;

@@ -10,6 +10,7 @@ export interface CustomerFormPayload {
   domain:             string;
   orgNumber:          string;
   address:            string;
+  postcode:           string;
   state:              string;
   assignedTech:       string;
   notes:              string;
@@ -39,6 +40,7 @@ function payloadToDb(data: CustomerFormPayload) {
     domain:       data.domain       || undefined,
     orgNumber:    data.orgNumber    || undefined,
     address:      data.address      || undefined,
+    postcode:     data.postcode     || undefined,
     state:        data.state        || undefined,
     assignedTech: data.assignedTech || undefined,
     notes:        data.notes        || undefined,

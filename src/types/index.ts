@@ -26,6 +26,7 @@ export interface Customer {
   domain?:      string;
   orgNumber?:   string;
   address?:     string;
+  postcode?:    string;
   state?:       string;
   notes?:       string;
   integrations: {

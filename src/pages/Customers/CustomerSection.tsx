@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../../components/ui/cn';
 import { CustomerRow } from './CustomerRow';
 import type { Customer } from '../../types';
+
+export type CustomerSortKey = 'name' | 'health' | 'alerts' | 'tier' | 'lastSync' | 'assignedTech';
+export type CustomerSortDir = 'asc' | 'desc';
 
 interface CustomerSectionProps {
   title:         string;
@@ -12,20 +15,32 @@ interface CustomerSectionProps {
   defaultOpen?:  boolean;
   collapsible?:  boolean;
   archived?:     boolean;
+  sortKey?:      CustomerSortKey;
+  sortDir?:      CustomerSortDir;
+  onSort?:       (k: CustomerSortKey) => void;
 }
 
-const TABLE_HEADERS = [
-  { label: 'Customer',      className: '' },
-  { label: 'Health',        className: 'hidden sm:table-cell' },
-  { label: 'Alerts',        className: 'hidden md:table-cell' },
-  { label: 'Tier',          className: 'hidden lg:table-cell' },
-  { label: 'Last Sync',     className: 'hidden lg:table-cell' },
-  { label: 'Assigned Tech', className: 'hidden xl:table-cell' },
+const TABLE_HEADERS: Array<{ label: string; key?: CustomerSortKey; className: string }> = [
+  { label: 'Customer',      key: 'name',        className: '' },
+  { label: 'Health',        key: 'health',      className: 'hidden sm:table-cell' },
+  { label: 'Alerts',        key: 'alerts',      className: 'hidden md:table-cell' },
+  { label: 'Tier',          key: 'tier',        className: 'hidden lg:table-cell' },
+  { label: 'Last Sync',     key: 'lastSync',    className: 'hidden lg:table-cell' },
+  { label: 'Assigned Tech', key: 'assignedTech',className: 'hidden xl:table-cell' },
   { label: '',              className: '' },
 ];
 
 export function CustomerSection({
-  title, customers, onEdit, onView, defaultOpen = true, collapsible, archived,
+  title,
+  customers,
+  onEdit,
+  onView,
+  defaultOpen = true,
+  collapsible,
+  archived,
+  sortKey,
+  sortDir,
+  onSort,
 }: CustomerSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -63,7 +78,24 @@ export function CustomerSection({
                         h.className,
                       )}
                     >
-                      {h.label}
+                      {h.key && onSort ? (
+                        <button
+                          type="button"
+                          onClick={() => onSort(h.key!)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 transition-colors',
+                            sortKey === h.key ? 'text-accent' : 'text-text-muted hover:text-text-primary',
+                          )}
+                        >
+                          {h.label}
+                          {sortKey === h.key
+                            ? (sortDir === 'asc' ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />)
+                            : <ChevronsUpDown className="size-3" />
+                          }
+                        </button>
+                      ) : (
+                        h.label
+                      )}
                     </th>
                   ))}
                 </tr>

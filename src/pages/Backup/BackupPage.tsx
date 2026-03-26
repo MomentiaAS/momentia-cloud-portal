@@ -9,6 +9,7 @@ import { useCustomers } from '../../hooks/useCustomers';
 import type { BackupJob } from '../../types';
 import { cn } from '../../components/ui/cn';
 import { format, formatDistanceToNow } from 'date-fns';
+import { ResizableColGroup, ResizableTh, useResizableColumns } from '../../components/ui/ResizableColumns';
 
 type JobStatus = BackupJob['status'];
 
@@ -100,6 +101,31 @@ export function BackupPage() {
 
   const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? id;
 
+  const { widths, setWidth } = useResizableColumns({
+    tableId: 'backup-jobs',
+    defaults: {
+      statusIcon: 90,
+      jobName: 260,
+      customer: 220,
+      lastRun: 160,
+      size: 120,
+      repository: 200,
+      status: 140,
+    },
+    minWidth: 90,
+    maxWidth: 620,
+  });
+
+  const cols = [
+    { key: 'statusIcon' },
+    { key: 'jobName' },
+    { key: 'customer' },
+    { key: 'lastRun' },
+    { key: 'size', hidden: true }, // hidden md via th/td
+    { key: 'repository', hidden: true }, // hidden md via th/td
+    { key: 'status' },
+  ] as const;
+
   const failed   = jobs.filter(j => j.status === 'failed').length;
   const warnings = jobs.filter(j => j.status === 'warning').length;
   const success  = jobs.filter(j => j.status === 'success').length;
@@ -152,18 +178,30 @@ export function BackupPage() {
         <CardBody>
           <div className="overflow-x-auto">
             <table className="w-full">
+              <ResizableColGroup columns={cols as unknown as Array<{ key: string; hidden?: boolean }>} widths={widths} />
               <thead>
                 <tr className="border-b border-border">
-                  {['Status', 'Job Name', 'Customer', 'Last Run', 'Size', 'Repository', ''].map(h => (
-                    <th
-                      key={h}
+                  {([
+                    ['statusIcon', 'Status', ''],
+                    ['jobName', 'Job Name', ''],
+                    ['customer', 'Customer', ''],
+                    ['lastRun', 'Last Run', ''],
+                    ['size', 'Size', 'hidden md:table-cell'],
+                    ['repository', 'Repository', 'hidden md:table-cell'],
+                    ['status', '', 'text-right'],
+                  ] as Array<[string, string, string]>).map(([key, label, extra]) => (
+                    <ResizableTh
+                      key={key}
+                      colKey={key}
+                      widths={widths}
+                      onResize={setWidth}
                       className={cn(
-                        'px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider',
-                        (h === 'Size' || h === 'Repository') && 'hidden md:table-cell',
+                        'text-left text-xs font-semibold text-text-muted uppercase tracking-wider',
+                        extra,
                       )}
                     >
-                      {h}
-                    </th>
+                      {label}
+                    </ResizableTh>
                   ))}
                 </tr>
               </thead>

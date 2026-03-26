@@ -10,6 +10,7 @@ import { useCustomers } from '../../hooks/useCustomers';
 import type { Severity } from '../../types';
 import { cn } from '../../components/ui/cn';
 import { format } from 'date-fns';
+import { ResizableColGroup, ResizableTh, useResizableColumns } from '../../components/ui/ResizableColumns';
 
 const SEVERITIES: Array<Severity | 'all'> = ['all', 'critical', 'high', 'medium', 'low', 'info'];
 const TIME_RANGES = ['All time', 'Last hour', 'Last 24h', 'Last 7 days'];
@@ -59,6 +60,27 @@ export function LogsPage() {
     if (!id) return 'Portal / System';
     return customers.find(c => c.id === id)?.name ?? id;
   };
+
+  const { widths, setWidth } = useResizableColumns({
+    tableId: 'logs',
+    defaults: {
+      severity: 140,
+      timestamp: 180,
+      system: 160,
+      customer: 220,
+      message: 520,
+    },
+    minWidth: 110,
+    maxWidth: 900,
+  });
+
+  const cols = [
+    { key: 'severity' },
+    { key: 'timestamp' },
+    { key: 'system' },
+    { key: 'customer', hidden: true }, // hidden md via <th>/<td>
+    { key: 'message' },
+  ] as const;
 
   return (
     <div className="space-y-4">
@@ -117,18 +139,28 @@ export function LogsPage() {
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full">
+                <ResizableColGroup columns={cols as unknown as Array<{ key: string; hidden?: boolean }>} widths={widths} />
                 <thead>
                   <tr className="border-b border-border">
-                    {['Severity', 'Timestamp', 'System', 'Customer', 'Message'].map(h => (
-                      <th
-                        key={h}
+                    {([
+                      ['severity', 'Severity', ''],
+                      ['timestamp', 'Timestamp', ''],
+                      ['system', 'System', ''],
+                      ['customer', 'Customer', 'hidden md:table-cell'],
+                      ['message', 'Message', ''],
+                    ] as Array<[string, string, string]>).map(([key, label, extra]) => (
+                      <ResizableTh
+                        key={key}
+                        colKey={key}
+                        widths={widths}
+                        onResize={setWidth}
                         className={cn(
-                          'px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider',
-                          (h === 'Customer') && 'hidden md:table-cell',
+                          'text-left text-xs font-semibold text-text-muted uppercase tracking-wider',
+                          extra,
                         )}
                       >
-                        {h}
-                      </th>
+                        {label}
+                      </ResizableTh>
                     ))}
                   </tr>
                 </thead>

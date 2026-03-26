@@ -143,9 +143,11 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
   allCustomers:  { id: string; name: string }[];
 }) {
   const ADD_USER_DRAFT_KEY = 'momentia:draft:add-user';
-  const [name,     setName]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName,  setLastName]  = useState('');
+  const [email,     setEmail]     = useState('');
+  const [phone,     setPhone]     = useState('');
+  const [password,  setPassword]  = useState('');
   const [role,     setRole]     = useState<UserRole>('technician');
   const [initialCustomerId, setInitialCustomerId] = useState('');
   const [busy,     setBusy]     = useState(false);
@@ -158,14 +160,18 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
       const raw = sessionStorage.getItem(ADD_USER_DRAFT_KEY);
       if (!raw) return;
       const draft = JSON.parse(raw) as Partial<{
-        name: string;
+        firstName: string;
+        lastName: string;
         email: string;
+        phone: string;
         password: string;
         role: UserRole;
         initialCustomerId: string;
       }>;
-      if (draft.name) setName(draft.name);
+      if (draft.firstName) setFirstName(draft.firstName);
+      if (draft.lastName) setLastName(draft.lastName);
       if (draft.email) setEmail(draft.email);
+      if (draft.phone) setPhone(draft.phone);
       if (draft.password) setPassword(draft.password);
       if (draft.role) setRole(draft.role);
       if (draft.initialCustomerId) setInitialCustomerId(draft.initialCustomerId);
@@ -178,20 +184,22 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
     if (success) return;
     sessionStorage.setItem(
       ADD_USER_DRAFT_KEY,
-      JSON.stringify({ name, email, password, role, initialCustomerId }),
+      JSON.stringify({ firstName, lastName, email, phone, password, role, initialCustomerId }),
     );
-  }, [name, email, password, role, initialCustomerId, success]);
+  }, [firstName, lastName, email, phone, password, role, initialCustomerId, success]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password) return;
+    const fullName = `${firstName} ${lastName}`.trim().replace(/\s+/g, ' ');
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) return;
     if (needsCustomerScope && !initialCustomerId) return;
     setBusy(true);
     setError(null);
     try {
       await onCreate({
-        name: name.trim(),
+        name: fullName,
         email: email.trim(),
+        phone: phone.trim() || undefined,
         password,
         role,
         initialCustomerId: needsCustomerScope ? initialCustomerId : undefined,
@@ -236,22 +244,30 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Full Name</label>
-                <input className={inputClass} value={name} onChange={e => setName(e.target.value)} required />
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">First name</label>
+                <input className={inputClass} value={firstName} onChange={e => setFirstName(e.target.value)} required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Last name</label>
+                <input className={inputClass} value={lastName} onChange={e => setLastName(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Email</label>
                 <input type="email" className={inputClass} value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Temporary Password</label>
-                <input type="password" className={inputClass} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Phone</label>
+                <input className={inputClass} value={phone} onChange={e => setPhone(e.target.value)} placeholder="Optional" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Role</label>
                 <select className={cn(inputClass, 'bg-surface')} value={role} onChange={e => setRole(e.target.value as UserRole)}>
                   {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Temporary Password</label>
+                <input type="password" className={inputClass} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
               </div>
               {needsCustomerScope && (
                 <div className="flex flex-col gap-1.5 sm:col-span-2">

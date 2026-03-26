@@ -5,6 +5,7 @@ type UserRole = 'superadmin' | 'admin' | 'technician' | 'viewer';
 type CreateUserRequest = {
   name: string;
   email: string;
+  phone?: string | null;
   password: string;
   role: UserRole;
   initialCustomerId?: string | null;
@@ -66,6 +67,7 @@ Deno.serve(async (req: Request) => {
     const body = (await req.json()) as CreateUserRequest;
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
+    const phone = body.phone?.trim() || null;
     const password = body.password ?? '';
     const role = body.role;
     const initialCustomerId = body.initialCustomerId ?? null;
@@ -92,7 +94,7 @@ Deno.serve(async (req: Request) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { name },
+      user_metadata: { name, phone },
     });
     if (createErr || !created.user) {
       return json(400, { error: createErr?.message ?? 'Failed to create user.' });
@@ -103,7 +105,7 @@ Deno.serve(async (req: Request) => {
     const { error: upsertErr } = await admin
       .from('profiles')
       .upsert(
-        { id: userId, email, name, role },
+        { id: userId, email, name, phone, role },
         { onConflict: 'id' },
       );
     if (upsertErr) {
@@ -123,6 +125,7 @@ Deno.serve(async (req: Request) => {
       id: userId,
       email,
       name,
+      phone,
       role,
     });
   } catch (e) {

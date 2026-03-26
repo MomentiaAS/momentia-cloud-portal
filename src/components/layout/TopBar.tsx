@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Sun, Moon, Bell, Menu, RefreshCw, CalendarDays, ChevronDown, LogOut, UserCircle } from 'lucide-react';
+import { Sun, Moon, Bell, Menu, RefreshCw, CalendarDays, ChevronDown, LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../ui/cn';
 import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { CountBadge } from '../ui/Badge';
+import { GlobalSearchBar } from './GlobalSearchBar';
 import { useTheme } from '../../context/ThemeContext';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -35,7 +35,6 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
   const { assets, reload: reloadAssets } = useAllAssets();
   const navigate = useNavigate();
 
-  const [searchVal, setSearchVal]       = useState('');
   const [dateRange, setDateRange]       = useState('Last 7 days');
   const [showDateDrop, setShowDateDrop] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -61,11 +60,6 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
     window.addEventListener('notifications-updated', onNotificationsUpdated);
     return () => window.removeEventListener('notifications-updated', onNotificationsUpdated);
   }, [reloadAlerts, reloadAssets]);
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (searchVal.trim()) navigate(`/customers?q=${encodeURIComponent(searchVal.trim())}`);
-  }
 
   function handleRefresh() {
     setRefreshSpin(true);
@@ -107,18 +101,8 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
         <Menu className="size-4" />
       </Button>
 
-      {/* Search */}
-      <form onSubmit={handleSearch} className="flex-1 max-w-sm">
-        <Input
-          leftIcon={<Search className="size-3.5" />}
-          placeholder="Search customers, sites, assets, alerts…"
-          value={searchVal}
-          onChange={e => setSearchVal(e.target.value)}
-          clearable
-          onClear={() => setSearchVal('')}
-          aria-label="Search"
-        />
-      </form>
+      {/* Global search */}
+      <GlobalSearchBar />
 
       <div className="flex-1" />
 

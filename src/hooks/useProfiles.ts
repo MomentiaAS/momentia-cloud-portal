@@ -5,6 +5,7 @@ import type { Profile, UserRole } from '../context/AuthContext';
 export interface CreateUserPayload {
   name:              string;
   email:             string;
+  phone?:            string;
   password:          string;
   role:              UserRole;
   initialCustomerId?: string;
@@ -90,6 +91,7 @@ export function useProfiles() {
       body: {
         name: payload.name,
         email: payload.email,
+        phone: payload.phone ?? null,
         password: payload.password,
         role: payload.role,
         initialCustomerId: payload.initialCustomerId ?? null,

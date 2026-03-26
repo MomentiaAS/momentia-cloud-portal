@@ -9,6 +9,7 @@ import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { cn } from '../../components/ui/cn';
+import { ResizableColGroup, ResizableTh, useResizableColumns } from '../../components/ui/ResizableColumns';
 import { useAllAssets } from '../../hooks/useAssets';
 import { useCustomers } from '../../hooks/useCustomers';
 import { deleteAsset, insertAsset, updateAsset } from '../../lib/db';
@@ -39,7 +40,20 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
 
 // ── Sort ─────────────────────────────────────────────────────────────────────
 
-type SortKey = 'name' | 'type' | 'customer' | 'model' | 'serial' | 'assignedTo' | 'ipAddress' | 'macAddress' | 'status' | 'warrantyEnd';
+type SortKey =
+  | 'name'
+  | 'type'
+  | 'customer'
+  | 'make'
+  | 'model'
+  | 'serial'
+  | 'assignedTo'
+  | 'location'
+  | 'ipAddress'
+  | 'macAddress'
+  | 'status'
+  | 'purchaseDate'
+  | 'warrantyEnd';
 type SortDir = 'asc' | 'desc';
 
 function sortAssets(
@@ -55,12 +69,15 @@ function sortAssets(
       case 'name':       av = a.name;                           bv = b.name;                           break;
       case 'type':       av = TYPE_META[a.type]?.label ?? '';   bv = TYPE_META[b.type]?.label ?? '';   break;
       case 'customer':   av = customerMap[a.customerId] ?? '';  bv = customerMap[b.customerId] ?? '';  break;
+      case 'make':       av = a.make        ?? '';              bv = b.make        ?? '';              break;
       case 'model':      av = a.model       ?? '';              bv = b.model       ?? '';              break;
       case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
       case 'assignedTo': av = a.assignedTo  ?? '';              bv = b.assignedTo  ?? '';              break;
+      case 'location':   av = a.location    ?? '';              bv = b.location    ?? '';              break;
       case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
       case 'macAddress': av = a.macAddress  ?? '';              bv = b.macAddress  ?? '';              break;
       case 'status':     av = a.status;                         bv = b.status;                         break;
+      case 'purchaseDate':av = a.purchaseDate ?? '';            bv = b.purchaseDate ?? '';            break;
       case 'warrantyEnd':av = a.warrantyEnd ?? '';              bv = b.warrantyEnd ?? '';              break;
     }
     const cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
@@ -86,11 +103,15 @@ function exportToPdf(
         <td>${a.name}${a.make || a.model ? `<br><small>${[a.make, a.model].filter(Boolean).join(' ')}</small>` : ''}</td>
         <td>${TYPE_META[a.type]?.label ?? a.type}</td>
         <td>${customerMap[a.customerId] ?? '—'}</td>
+        <td>${a.make ?? '—'}</td>
+        <td>${a.model ?? '—'}</td>
         <td class="mono">${a.serial ?? '—'}</td>
         <td>${a.assignedTo ?? '—'}</td>
+        <td>${a.location ?? '—'}</td>
         <td class="mono">${a.ipAddress ?? '—'}</td>
         <td class="mono">${a.macAddress ?? '—'}</td>
         <td>${a.status}</td>
+        <td class="mono">${a.purchaseDate ?? '—'}</td>
         <td class="${ws === 'expired' ? 'warn-expired' : ws === 'soon' ? 'warn-soon' : ''}">${warLabel}</td>
       </tr>`;
   }).join('');
@@ -126,8 +147,8 @@ function exportToPdf(
   <table>
     <thead>
       <tr>
-        <th>Asset</th><th>Type</th><th>Customer</th><th>Serial</th>
-        <th>Assigned To</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Warranty</th>
+        <th>Asset</th><th>Type</th><th>Customer</th><th>Make</th><th>Model</th><th>Serial</th>
+        <th>Assigned To</th><th>Location</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Purchase</th><th>Warranty</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -191,11 +212,15 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
     'Asset',
     'Type',
     'Customer',
+    'Make',
+    'Model',
     'Serial',
     'Assigned To',
+    'Location',
     'IP Address',
     'MAC Address',
     'Status',
+    'Purchase Date',
     'Warranty',
   ];
 
@@ -213,11 +238,15 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
       assetLabel,
       TYPE_META[a.type]?.label ?? a.type,
       customerMap[a.customerId] ?? '—',
+      a.make ?? '—',
+      a.model ?? '—',
       a.serial ?? '—',
       a.assignedTo ?? '—',
+      a.location ?? '—',
       a.ipAddress ?? '—',
       a.macAddress ?? '—',
       a.status,
+      a.purchaseDate ?? '—',
       warLabel,
     ].map(csvEscape);
   });
@@ -260,6 +289,42 @@ function SortTh({
         <Icon className="size-3 shrink-0" />
       </button>
     </th>
+  );
+}
+
+function ResizableSortTh({
+  colKey,
+  label,
+  sortKey,
+  active,
+  dir,
+  onSort,
+  widths,
+  onResize,
+}: {
+  colKey: SortKey;
+  label: string;
+  sortKey: SortKey;
+  active: boolean;
+  dir: SortDir;
+  onSort: (k: SortKey) => void;
+  widths: Record<string, number>;
+  onResize: (key: string, nextWidth: number) => void;
+}) {
+  const Icon = active ? (dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
+  return (
+    <ResizableTh colKey={colKey} widths={widths} onResize={onResize}>
+      <button
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          'flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider transition-colors',
+          active ? 'text-accent' : 'text-text-muted hover:text-text-primary',
+        )}
+      >
+        {label}
+        <Icon className="size-3 shrink-0" />
+      </button>
+    </ResizableTh>
   );
 }
 
@@ -307,9 +372,11 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
           <ExternalLink className="size-3" />
         </button>
       </td>
+      <td className="px-4 py-3 text-xs text-text-muted">{asset.make ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.assignedTo ?? '—'}</td>
+      <td className="px-4 py-3 text-xs text-text-muted">{asset.location ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.macAddress ?? '—'}</td>
       <td className="px-4 py-3">
@@ -320,6 +387,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
                                        'bg-surface text-text-muted border border-border',
         )}>{asset.status}</span>
       </td>
+      <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.purchaseDate ?? '—'}</td>
       <td className="px-4 py-3">
         {ws === null ? <span className="text-xs text-text-muted">—</span> : (
           <span className={cn(
@@ -372,12 +440,15 @@ const COLUMNS: { label: string; key: SortKey }[] = [
   { label: 'Asset',       key: 'name'       },
   { label: 'Type',        key: 'type'       },
   { label: 'Customer',    key: 'customer'   },
+  { label: 'Make',        key: 'make'       },
   { label: 'Model',       key: 'model'      },
   { label: 'Serial',      key: 'serial'     },
   { label: 'Assigned To', key: 'assignedTo' },
+  { label: 'Location',    key: 'location'   },
   { label: 'IP Address',  key: 'ipAddress'  },
   { label: 'MAC Address', key: 'macAddress' },
   { label: 'Status',      key: 'status'     },
+  { label: 'Purchase',    key: 'purchaseDate'},
   { label: 'Warranty',    key: 'warrantyEnd'},
 ];
 
@@ -405,6 +476,52 @@ export function AssetsPage() {
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
     [customers],
   );
+  const customerById = useMemo(
+    () => Object.fromEntries(customers.map(c => [c.id, c])),
+    [customers],
+  );
+
+  const assetsCols = useMemo(
+    () => ([
+      { key: 'name' },
+      { key: 'type' },
+      { key: 'customer' },
+      { key: 'make' },
+      { key: 'model' },
+      { key: 'serial' },
+      { key: 'assignedTo' },
+      { key: 'location' },
+      { key: 'ipAddress' },
+      { key: 'macAddress' },
+      { key: 'status' },
+      { key: 'purchaseDate' },
+      { key: 'warrantyEnd' },
+      { key: 'actions' },
+    ] as const),
+    [],
+  );
+
+  const { widths: colWidths, setWidth: setColWidth } = useResizableColumns({
+    tableId: 'assets',
+    defaults: {
+      name: 260,
+      type: 140,
+      customer: 220,
+      make: 140,
+      model: 160,
+      serial: 160,
+      assignedTo: 160,
+      location: 160,
+      ipAddress: 140,
+      macAddress: 160,
+      status: 120,
+      purchaseDate: 140,
+      warrantyEnd: 140,
+      actions: 120,
+    },
+    minWidth: 90,
+    maxWidth: 520,
+  });
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -617,31 +734,41 @@ export function AssetsPage() {
             </p>
           ) : (
             <table className="w-full text-left">
+              <ResizableColGroup columns={assetsCols as unknown as Array<{ key: string }>} widths={colWidths} />
               <thead>
                 <tr className="border-b border-border bg-surface-raised/50">
-                  {(['name','type','customer','model','serial','assignedTo','ipAddress','macAddress'] as SortKey[]).map((k, i) => (
-                    <SortTh
+                  {([
+                    ['name','Asset'],
+                    ['type','Type'],
+                    ['customer','Customer'],
+                    ['make','Make'],
+                    ['model','Model'],
+                    ['serial','Serial'],
+                    ['assignedTo','Assigned To'],
+                    ['location','Location'],
+                    ['ipAddress','IP Address'],
+                    ['macAddress','MAC Address'],
+                    ['status','Status'],
+                    ['purchaseDate','Purchase'],
+                    ['warrantyEnd','Warranty'],
+                  ] as Array<[SortKey, string]>).map(([k, label]) => (
+                    <ResizableSortTh
                       key={k}
-                      label={['Asset','Type','Customer','Model','Serial','Assigned To','IP Address','MAC Address'][i]}
+                      colKey={k}
+                      label={label}
                       sortKey={k}
                       active={sortKey === k}
                       dir={sortDir}
                       onSort={handleSort}
+                      widths={colWidths}
+                      onResize={setColWidth}
                     />
                   ))}
-                  {(['status','warrantyEnd'] as SortKey[]).map((k, i) => (
-                    <SortTh
-                      key={k}
-                      label={['Status','Warranty'][i]}
-                      sortKey={k}
-                      active={sortKey === k}
-                      dir={sortDir}
-                      onSort={handleSort}
-                    />
-                  ))}
-                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                    Actions
-                  </th>
+                  <ResizableTh colKey="actions" widths={colWidths} onResize={setColWidth} className="text-right">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                      Actions
+                    </span>
+                  </ResizableTh>
                 </tr>
               </thead>
               <tbody>
@@ -727,13 +854,15 @@ export function AssetsPage() {
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 {[
+                  ['Contact', customerById[selectedAsset.customerId]?.primaryContact?.name ?? '—'],
+                  ['eMail', customerById[selectedAsset.customerId]?.primaryContact?.email ?? '—'],
+                  ['Phone', customerById[selectedAsset.customerId]?.primaryContact?.phone ?? '—'],
                   ['Type', selectedAsset.type],
                   ['Status', selectedAsset.status],
                   ['Make', selectedAsset.make ?? '—'],
                   ['Model', selectedAsset.model ?? '—'],
                   ['Serial', selectedAsset.serial ?? '—'],
                   ['Operating system', selectedAsset.os ?? '—'],
-                  ['Assigned to', selectedAsset.assignedTo ?? '—'],
                   ['IP address', selectedAsset.ipAddress ?? '—'],
                   ['MAC address', selectedAsset.macAddress ?? '—'],
                   ['Location', selectedAsset.location ?? '—'],

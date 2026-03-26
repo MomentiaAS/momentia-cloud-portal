@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../../components/ui/cn';
+import { ResizableColGroup, ResizableTh, useResizableColumns } from '../../components/ui/ResizableColumns';
 import { CustomerRow } from './CustomerRow';
 import type { Customer } from '../../types';
 
@@ -43,6 +44,30 @@ export function CustomerSection({
   onSort,
 }: CustomerSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const { widths, setWidth } = useResizableColumns({
+    tableId: `customers:${title.toLowerCase()}`,
+    defaults: {
+      name: 260,
+      health: 140,
+      alerts: 120,
+      tier: 120,
+      lastSync: 160,
+      assignedTech: 180,
+      actions: 120,
+    },
+    minWidth: 90,
+    maxWidth: 520,
+  });
+
+  const cols = [
+    { key: 'name' },
+    { key: 'health', hidden: TABLE_HEADERS[1].className.includes('hidden') },
+    { key: 'alerts', hidden: TABLE_HEADERS[2].className.includes('hidden') },
+    { key: 'tier', hidden: TABLE_HEADERS[3].className.includes('hidden') },
+    { key: 'lastSync', hidden: TABLE_HEADERS[4].className.includes('hidden') },
+    { key: 'assignedTech', hidden: TABLE_HEADERS[5].className.includes('hidden') },
+    { key: 'actions' },
+  ] as const;
 
   return (
     <section className="mb-6">
@@ -68,13 +93,17 @@ export function CustomerSection({
         <div className="bg-surface-raised border border-border rounded-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
+              <ResizableColGroup columns={cols as unknown as Array<{ key: string; hidden?: boolean }>} widths={widths} />
               <thead>
                 <tr className="border-b border-border">
                   {TABLE_HEADERS.map((h, i) => (
-                    <th
+                    <ResizableTh
                       key={i}
+                      colKey={h.key ?? (i === TABLE_HEADERS.length - 1 ? 'actions' : `col-${i}`)}
+                      widths={widths}
+                      onResize={setWidth}
                       className={cn(
-                        'px-4 py-2.5 text-left text-xs font-semibold text-text-muted uppercase tracking-wider',
+                        'text-left text-xs font-semibold text-text-muted uppercase tracking-wider',
                         h.className,
                       )}
                     >
@@ -96,7 +125,7 @@ export function CustomerSection({
                       ) : (
                         h.label
                       )}
-                    </th>
+                    </ResizableTh>
                   ))}
                 </tr>
               </thead>

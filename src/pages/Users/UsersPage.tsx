@@ -40,6 +40,7 @@ const inputClass = cn(
   'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary',
   'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
   'disabled:opacity-50 disabled:cursor-not-allowed transition-colors',
+  'appearance-none',
 );
 
 function csvEscape(v: unknown): string {
@@ -144,7 +145,6 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
   onCreate:      (p: CreateUserPayload) => Promise<void>;
   allCustomers:  { id: string; name: string }[];
 }) {
-  const ADD_USER_DRAFT_KEY = 'momentia:draft:add-user';
   const [firstName, setFirstName] = useState('');
   const [lastName,  setLastName]  = useState('');
   const [email,     setEmail]     = useState('');
@@ -156,39 +156,6 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
   const [error,    setError]    = useState<string | null>(null);
   const [success,  setSuccess]  = useState(false);
   const needsCustomerScope = role === 'technician' || role === 'viewer';
-
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(ADD_USER_DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as Partial<{
-        firstName: string;
-        lastName: string;
-        email: string;
-        phone: string;
-        password: string;
-        role: UserRole;
-        initialCustomerId: string;
-      }>;
-      if (draft.firstName) setFirstName(draft.firstName);
-      if (draft.lastName) setLastName(draft.lastName);
-      if (draft.email) setEmail(draft.email);
-      if (draft.phone) setPhone(draft.phone);
-      if (draft.password) setPassword(draft.password);
-      if (draft.role) setRole(draft.role);
-      if (draft.initialCustomerId) setInitialCustomerId(draft.initialCustomerId);
-    } catch {
-      // ignore malformed draft
-    }
-  }, []);
-
-  useEffect(() => {
-    if (success) return;
-    sessionStorage.setItem(
-      ADD_USER_DRAFT_KEY,
-      JSON.stringify({ firstName, lastName, email, phone, password, role, initialCustomerId }),
-    );
-  }, [firstName, lastName, email, phone, password, role, initialCustomerId, success]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -206,7 +173,6 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
         role,
         initialCustomerId: needsCustomerScope ? initialCustomerId : undefined,
       });
-      sessionStorage.removeItem(ADD_USER_DRAFT_KEY);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user.');
@@ -232,7 +198,7 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
             </div>
             <p className="font-semibold text-text-primary">User created!</p>
             <p className="text-sm text-text-muted">
-              <strong>{email}</strong> can sign in immediately with the temporary password.
+              <strong>{email}</strong> can sign in immediately with the password you set.
             </p>
             <Button variant="primary" size="sm" onClick={onClose} className="mt-2">Done</Button>
           </div>
@@ -268,7 +234,7 @@ function CreateUserModal({ onClose, onCreate, allCustomers }: {
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Temporary Password</label>
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Password</label>
                 <input type="password" className={inputClass} value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
               </div>
               {needsCustomerScope && (

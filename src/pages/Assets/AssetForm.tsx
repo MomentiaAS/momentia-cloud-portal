@@ -84,6 +84,7 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
   const [busy,  setBusy]  = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isAddMode = !initial;
+  const formId = 'asset-form';
 
   useEffect(() => {
     if (open) {
@@ -134,7 +135,7 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+        <form id={formId} onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
           {error && (
             <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2.5">
@@ -229,7 +230,7 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
         {/* Footer */}
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-border shrink-0">
           <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button type="submit" variant="primary" size="sm" disabled={busy || !form.name.trim()} onClick={handleSubmit}>
+          <Button type="submit" form={formId} variant="primary" size="sm" disabled={busy || !form.name.trim()}>
             {busy ? 'Saving…' : initial ? 'Save Changes' : 'Add Asset'}
           </Button>
         </div>

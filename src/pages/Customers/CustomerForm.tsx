@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type KeyboardEvent } from 'react';
 import { Input, Select, Textarea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -175,6 +175,16 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
     }
   }
 
+  function handleKeyDownSubmit(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'TEXTAREA') return;
+    // Let dropdowns/selects keep their native Enter behavior.
+    if (target.tagName === 'SELECT') return;
+    e.preventDefault();
+    void handleSave();
+  }
+
   const set = <K extends keyof CustomerFormPayload>(key: K, val: CustomerFormPayload[K]) =>
     setForm(prev => ({ ...prev, [key]: val }));
 
@@ -205,7 +215,7 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
         </>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-6" onKeyDown={handleKeyDownSubmit}>
         {saveErr && (
           <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-600 dark:text-red-400">
             {saveErr}

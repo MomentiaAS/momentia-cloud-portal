@@ -60,7 +60,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               onClick={onClear}
               className="absolute right-3 text-text-muted hover:text-text-primary"
               aria-label="Clear"
-              tabIndex={-1}
             >
               <X className="size-3.5" />
             </button>

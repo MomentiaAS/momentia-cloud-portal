@@ -162,11 +162,23 @@ export function WeatherCard({ className }: { className?: string }) {
                   aria-expanded={suggestions.length > 0}
                 />
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
-                  {searching
-                    ? <Loader2 className="size-3.5 animate-spin" />
-                    : null
-                  }
+                  {searching ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 </span>
+                {query && !searching && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      setSuggestions([]);
+                      setActiveIdx(-1);
+                      setSearchErr('');
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                    aria-label="Clear search"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
               </div>
               <button
                 onClick={closeSearch}

@@ -497,7 +497,7 @@ export function AssetsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={handleAddAsset} disabled={customers.length === 0}>
+          <Button variant="primary" size="sm" onClick={handleAddAsset} disabled={customers.length === 0}>
             Add asset
           </Button>
           <div ref={exportRef} className="relative">

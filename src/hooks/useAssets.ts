@@ -33,6 +33,15 @@ export function useCustomerAssets(customerId: string) {
     setAssets(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
+  async function addAssets(items: AssetPayload[]): Promise<void> {
+    if (items.length === 0) return;
+    const created: Asset[] = [];
+    for (const item of items) {
+      created.push(await insertAsset(customerId, item));
+    }
+    setAssets(prev => [...prev, ...created].sort((a, b) => a.name.localeCompare(b.name)));
+  }
+
   async function editAsset(id: string, p: AssetPayload): Promise<void> {
     const updated = await updateAsset(id, p);
     setAssets(prev => prev.map(a => a.id === id ? updated : a));
@@ -43,7 +52,7 @@ export function useCustomerAssets(customerId: string) {
     setAssets(prev => prev.filter(a => a.id !== id));
   }
 
-  return { assets, loading, error, reload: load, addAsset, editAsset, removeAsset };
+  return { assets, loading, error, reload: load, addAsset, addAssets, editAsset, removeAsset };
 }
 
 /** Hook for all assets across all customers (used on the global Assets page). */

@@ -19,7 +19,7 @@ import { cn } from '../../components/ui/cn';
 import { useCustomerDetail } from '../../hooks/useCustomerDetail';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useUnifiStatus } from '../../hooks/useUnifiStatus';
-import { useCustomerAssets } from '../../hooks/useAssets';
+import { useCustomerAssets, type AssetPayload } from '../../hooks/useAssets';
 import { updateCustomer, upsertUnifiOfflineAlert, resolveUnifiOfflineAlerts } from '../../lib/db';
 import { CustomerForm } from './CustomerForm';
 import { AssetForm } from '../Assets/AssetForm';
@@ -138,8 +138,9 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
 }
 
 function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boolean }) {
-  const { assets, loading, error, addAsset, editAsset, removeAsset } = useCustomerAssets(customerId);
+  const { assets, loading, error, addAsset, addAssets, editAsset, removeAsset } = useCustomerAssets(customerId);
   const [formOpen,  setFormOpen]  = useState(false);
+  const [bulkOpen,  setBulkOpen]  = useState(false);
   const [editing,   setEditing]   = useState<Asset | null>(null);
   const [selected,  setSelected]  = useState<Asset | null>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
@@ -167,12 +168,20 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
       <div className="px-4 py-3 flex items-center justify-between border-b border-border">
         <p className="text-sm text-text-muted">{assets.length} asset{assets.length !== 1 ? 's' : ''}</p>
         {canEdit && (
-          <button
-            onClick={() => { setEditing(null); setFormOpen(true); }}
-            className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
-          >
-            <Plus className="size-3.5" /> Add Asset
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setEditing(null); setFormOpen(true); }}
+              className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+            >
+              <Plus className="size-3.5" /> Add Asset
+            </button>
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+            >
+              <Plus className="size-3.5" /> Bulk Add
+            </button>
+          </div>
         )}
       </div>
 
@@ -316,7 +325,141 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
         initial={editing}
         onSave={async p => { editing ? await editAsset(editing.id, p) : await addAsset(p); }}
       />
+      <BulkAddAssetsModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onSave={async (rows) => {
+          await addAssets(rows);
+          setBulkOpen(false);
+        }}
+      />
     </>
+  );
+}
+
+const BULK_BLANK: AssetPayload = {
+  name: '', type: 'computer', make: '', model: '', serial: '',
+  os: '', assignedTo: '', ipAddress: '', macAddress: '', location: '',
+  status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
+};
+
+function BulkAddAssetsModal({
+  open,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (rows: AssetPayload[]) => Promise<void>;
+}) {
+  const [rows, setRows] = useState<AssetPayload[]>([{ ...BULK_BLANK }]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setRows([{ ...BULK_BLANK }]);
+    setError(null);
+  }, [open]);
+
+  if (!open) return null;
+
+  function patchRow(index: number, key: keyof AssetPayload, value: string) {
+    setRows(prev => prev.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
+  }
+
+  function addRow() {
+    setRows(prev => [...prev, { ...BULK_BLANK }]);
+  }
+
+  function removeRow(index: number) {
+    setRows(prev => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const prepared = rows
+      .map(r => ({ ...r, name: r.name.trim() }))
+      .filter(r => r.name);
+    if (prepared.length === 0) {
+      setError('Add at least one asset name.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave(prepared);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add assets.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-6xl bg-surface-raised border border-border rounded-card shadow-modal max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h3 className="text-base font-semibold text-text-primary">Bulk Add Assets</h3>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </Button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto">
+          <div className="p-4 space-y-3">
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2.5">
+                <AlertCircle className="size-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
+            {rows.map((row, idx) => (
+              <div key={idx} className="border border-border rounded-lg p-3 bg-surface space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Asset #{idx + 1}</p>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} disabled={rows.length <= 1}>
+                    Remove
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <Input placeholder="Name *" value={row.name} onChange={e => patchRow(idx, 'name', e.target.value)} />
+                  <select className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary" value={row.type} onChange={e => patchRow(idx, 'type', e.target.value)}>
+                    <option value="computer">Computer / Laptop</option>
+                    <option value="server">Server</option>
+                    <option value="network">Network Equipment</option>
+                    <option value="mobile">Mobile Device</option>
+                    <option value="printer">Printer</option>
+                    <option value="license">License / Subscription</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <Input placeholder="Make" value={row.make} onChange={e => patchRow(idx, 'make', e.target.value)} />
+                  <Input placeholder="Model" value={row.model} onChange={e => patchRow(idx, 'model', e.target.value)} />
+                  <Input placeholder="Serial" value={row.serial} onChange={e => patchRow(idx, 'serial', e.target.value)} />
+                  <Input placeholder="Assigned to" value={row.assignedTo} onChange={e => patchRow(idx, 'assignedTo', e.target.value)} />
+                  <Input placeholder="IP address" value={row.ipAddress} onChange={e => patchRow(idx, 'ipAddress', e.target.value)} />
+                  <Input placeholder="MAC address" value={row.macAddress} onChange={e => patchRow(idx, 'macAddress', e.target.value)} />
+                  <Input placeholder="Location" value={row.location} onChange={e => patchRow(idx, 'location', e.target.value)} />
+                  <Input placeholder="Operating system" value={row.os} onChange={e => patchRow(idx, 'os', e.target.value)} />
+                  <input type="date" className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary" value={row.purchaseDate} onChange={e => patchRow(idx, 'purchaseDate', e.target.value)} />
+                  <input type="date" className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary" value={row.warrantyEnd} onChange={e => patchRow(idx, 'warrantyEnd', e.target.value)} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+            <Button type="button" variant="outline" size="sm" onClick={addRow}>
+              <Plus className="size-3.5 mr-1" /> Add row
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
+              <Button type="submit" variant="primary" size="sm" disabled={busy}>
+                {busy ? 'Adding…' : 'Add all'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

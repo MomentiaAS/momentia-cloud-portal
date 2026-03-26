@@ -647,9 +647,9 @@ export function AssetsPage() {
 
       {/* Asset detail drawer */}
       {selectedAsset && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedAsset(null)} />
-          <aside className="relative z-10 w-full max-w-md bg-surface-raised border-l border-border flex flex-col shadow-popover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="absolute inset-0" onClick={() => setSelectedAsset(null)} />
+          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selectedAsset.name}</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelectedAsset(null)} aria-label="Close">

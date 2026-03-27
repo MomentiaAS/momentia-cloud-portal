@@ -435,7 +435,6 @@ function BulkAddAssetsModal({
                   <Input placeholder="Make" value={row.make} onChange={e => patchRow(idx, 'make', e.target.value)} />
                   <Input placeholder="Model" value={row.model} onChange={e => patchRow(idx, 'model', e.target.value)} />
                   <Input placeholder="Serial" value={row.serial} onChange={e => patchRow(idx, 'serial', e.target.value)} />
-                  <Input placeholder="Assigned to" value={row.assignedTo} onChange={e => patchRow(idx, 'assignedTo', e.target.value)} />
                   <Input placeholder="IP address" value={row.ipAddress} onChange={e => patchRow(idx, 'ipAddress', e.target.value)} />
                   <Input placeholder="MAC address" value={row.macAddress} onChange={e => patchRow(idx, 'macAddress', e.target.value)} />
                   <Input placeholder="Location" value={row.location} onChange={e => patchRow(idx, 'location', e.target.value)} />

@@ -180,10 +180,6 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Operating System</label>
                 <input className={inputClass} value={form.os} onChange={e => set('os', e.target.value)} />
               </div>
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Assigned To</label>
-                <input className={inputClass} value={form.assignedTo} onChange={e => set('assignedTo', e.target.value)} />
-              </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">IP Address</label>
                 <input className={inputClass} value={form.ipAddress} onChange={e => set('ipAddress', e.target.value)} />

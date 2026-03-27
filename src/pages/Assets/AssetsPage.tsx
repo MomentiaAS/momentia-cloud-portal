@@ -48,7 +48,6 @@ type SortKey =
   | 'make'
   | 'model'
   | 'serial'
-  | 'assignedTo'
   | 'location'
   | 'ipAddress'
   | 'macAddress'
@@ -73,7 +72,6 @@ function sortAssets(
       case 'make':       av = a.make        ?? '';              bv = b.make        ?? '';              break;
       case 'model':      av = a.model       ?? '';              bv = b.model       ?? '';              break;
       case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
-      case 'assignedTo': av = a.assignedTo  ?? '';              bv = b.assignedTo  ?? '';              break;
       case 'location':   av = a.location    ?? '';              bv = b.location    ?? '';              break;
       case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
       case 'macAddress': av = a.macAddress  ?? '';              bv = b.macAddress  ?? '';              break;
@@ -350,7 +348,6 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
       <td className="px-4 py-3 text-xs text-text-muted">{asset.make ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted">{asset.assignedTo ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.location ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.macAddress ?? '—'}</td>
@@ -418,7 +415,6 @@ const COLUMNS: { label: string; key: SortKey }[] = [
   { label: 'Make',        key: 'make'       },
   { label: 'Model',       key: 'model'      },
   { label: 'Serial',      key: 'serial'     },
-  { label: 'Assigned To', key: 'assignedTo' },
   { label: 'Location',    key: 'location'   },
   { label: 'IP Address',  key: 'ipAddress'  },
   { label: 'MAC Address', key: 'macAddress' },
@@ -464,7 +460,6 @@ export function AssetsPage() {
       { key: 'make' },
       { key: 'model' },
       { key: 'serial' },
-      { key: 'assignedTo' },
       { key: 'location' },
       { key: 'ipAddress' },
       { key: 'macAddress' },
@@ -485,7 +480,6 @@ export function AssetsPage() {
       make: 140,
       model: 160,
       serial: 160,
-      assignedTo: 160,
       location: 160,
       ipAddress: 140,
       macAddress: 160,
@@ -719,7 +713,6 @@ export function AssetsPage() {
                     ['make','Make'],
                     ['model','Model'],
                     ['serial','Serial'],
-                    ['assignedTo','Assigned To'],
                     ['location','Location'],
                     ['ipAddress','IP Address'],
                     ['macAddress','MAC Address'],

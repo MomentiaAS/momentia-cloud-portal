@@ -49,6 +49,12 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
   return 'ok';
 }
 
+function assetStatusOrder(status: Asset['status']): number {
+  if (status === 'active') return 0;
+  if (status === 'spare') return 1; // shown as Passive in filters
+  return 2; // retired
+}
+
 // ── Sort ─────────────────────────────────────────────────────────────────────
 
 type SortKey =
@@ -415,7 +421,6 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
 
 const ALL_TYPES = [
   'All',
-  'router_firewall',
   'access_point',
   'access_control',
   'audio_video',
@@ -426,12 +431,13 @@ const ALL_TYPES = [
   'license_subscription',
   'mobile_device',
   'network_equipment',
+  'other',
   'printer',
+  'router_firewall',
   'server',
   'security',
   'switch',
   'tools',
-  'other',
 ] as const;
 
 const COLUMNS: { label: string; key: SortKey }[] = [
@@ -457,7 +463,11 @@ export function AssetsPage() {
   const [query,        setQuery]        = useState('');
   const [customerFilter, setCustomerFilter] = useState<string>('All');
   const [typeFilter,   setTypeFilter]   = useState<string>('All');
-  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [statusVisible, setStatusVisible] = useState<Record<Asset['status'], boolean>>({
+    active: true,
+    spare: true,
+    retired: true,
+  });
   const [sortKey,      setSortKey]      = useState<SortKey>('customer');
   const [sortDir,      setSortDir]      = useState<SortDir>('asc');
   const [exportOpen, setExportOpen] = useState(false);
@@ -560,7 +570,7 @@ export function AssetsPage() {
     const q = query.toLowerCase().trim();
     const base = assets.filter(a => {
       if (typeFilter   !== 'All' && a.type   !== typeFilter)   return false;
-      if (statusFilter !== 'All' && a.status !== statusFilter) return false;
+      if (!statusVisible[a.status]) return false;
       if (customerFilter !== 'All' && a.customerId !== customerFilter) return false;
       if (!q) return true;
       const cName = customerMap[a.customerId]?.toLowerCase() ?? '';
@@ -574,8 +584,9 @@ export function AssetsPage() {
         cName.includes(q)
       );
     });
-    return sortAssets(base, customerMap, sortKey, sortDir);
-  }, [assets, typeFilter, statusFilter, customerFilter, query, customerMap, sortKey, sortDir]);
+    const sorted = sortAssets(base, customerMap, sortKey, sortDir);
+    return [...sorted].sort((a, b) => assetStatusOrder(a.status) - assetStatusOrder(b.status));
+  }, [assets, typeFilter, statusVisible, customerFilter, query, customerMap, sortKey, sortDir]);
 
   const expiringCount = assets.filter(a => {
     const ws = warrantyStatus(a.warrantyEnd);
@@ -697,16 +708,41 @@ export function AssetsPage() {
             <option key={t} value={t}>{TYPE_META[t as AssetType].label}</option>
           ))}
         </select>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-        >
-          <option value="All">All statuses</option>
-          <option value="active">Active</option>
-          <option value="spare">Spare</option>
-          <option value="retired">Retired</option>
-        </select>
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+          <button
+            type="button"
+            onClick={() => setStatusVisible(prev => ({ ...prev, active: !prev.active }))}
+            className={cn(
+              'h-7 px-2.5 rounded text-xs font-medium transition-colors',
+              statusVisible.active ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'text-text-muted hover:text-text-primary',
+            )}
+            title={statusVisible.active ? 'Hide active' : 'Show active'}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusVisible(prev => ({ ...prev, spare: !prev.spare }))}
+            className={cn(
+              'h-7 px-2.5 rounded text-xs font-medium transition-colors',
+              statusVisible.spare ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : 'text-text-muted hover:text-text-primary',
+            )}
+            title={statusVisible.spare ? 'Hide passive' : 'Show passive'}
+          >
+            Passive
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusVisible(prev => ({ ...prev, retired: !prev.retired }))}
+            className={cn(
+              'h-7 px-2.5 rounded text-xs font-medium transition-colors',
+              statusVisible.retired ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'text-text-muted hover:text-text-primary',
+            )}
+            title={statusVisible.retired ? 'Hide retired' : 'Show retired'}
+          >
+            Retired
+          </button>
+        </div>
       </div>
 
       {/* Table */}

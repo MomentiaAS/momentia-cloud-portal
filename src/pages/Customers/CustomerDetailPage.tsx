@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, RefreshCw, AlertCircle,
@@ -152,6 +152,12 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
   return 'ok';
 }
 
+function assetStatusOrder(status: Asset['status']): number {
+  if (status === 'active') return 0;
+  if (status === 'spare') return 1; // shown as Passive in filters
+  return 2; // retired
+}
+
 function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boolean }) {
   const { assets, loading, error, addAsset, addAssets, editAsset, removeAsset } = useCustomerAssets(customerId);
   const [formOpen,  setFormOpen]  = useState(false);
@@ -161,11 +167,25 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
   const [selected,  setSelected]  = useState<Asset | null>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [statusVisible, setStatusVisible] = useState<Record<Asset['status'], boolean>>({
+    active: true,
+    spare: true,
+    retired: true,
+  });
 
   async function handleDelete(id: string) {
     setDeleteBusy(true);
     try { await removeAsset(id); } finally { setDeleteBusy(false); setDeleteId(null); }
   }
+
+  const visibleAssets = useMemo(() => {
+    const base = assets.filter(a => statusVisible[a.status]);
+    return [...base].sort((a, b) => {
+      const byStatus = assetStatusOrder(a.status) - assetStatusOrder(b.status);
+      if (byStatus !== 0) return byStatus;
+      return a.name.localeCompare(b.name);
+    });
+  }, [assets, statusVisible]);
 
   function cloneFrom(asset: Asset) {
     setEditing(null);
@@ -202,7 +222,9 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
   return (
     <>
       <div className="px-4 py-3 flex items-center justify-between border-b border-border">
-        <p className="text-sm text-text-muted">{assets.length} asset{assets.length !== 1 ? 's' : ''}</p>
+        <p className="text-sm text-text-muted">
+          {visibleAssets.length} of {assets.length} asset{assets.length !== 1 ? 's' : ''}
+        </p>
         {canEdit && (
           <div className="flex items-center gap-2">
             <button
@@ -221,6 +243,42 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
         )}
       </div>
 
+      <div className="px-4 py-2 border-b border-border flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setStatusVisible(prev => ({ ...prev, active: !prev.active }))}
+          className={cn(
+            'h-7 px-2.5 rounded text-xs font-medium transition-colors',
+            statusVisible.active ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'text-text-muted hover:text-text-primary',
+          )}
+          title={statusVisible.active ? 'Hide active' : 'Show active'}
+        >
+          Active
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusVisible(prev => ({ ...prev, spare: !prev.spare }))}
+          className={cn(
+            'h-7 px-2.5 rounded text-xs font-medium transition-colors',
+            statusVisible.spare ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : 'text-text-muted hover:text-text-primary',
+          )}
+          title={statusVisible.spare ? 'Hide passive' : 'Show passive'}
+        >
+          Passive
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusVisible(prev => ({ ...prev, retired: !prev.retired }))}
+          className={cn(
+            'h-7 px-2.5 rounded text-xs font-medium transition-colors',
+            statusVisible.retired ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'text-text-muted hover:text-text-primary',
+          )}
+          title={statusVisible.retired ? 'Hide retired' : 'Show retired'}
+        >
+          Retired
+        </button>
+      </div>
+
       {assets.length === 0 ? (
         <div className="py-10 text-center text-sm text-text-muted">
           No assets recorded for this customer.
@@ -230,9 +288,13 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
             </button>
           )}
         </div>
+      ) : visibleAssets.length === 0 ? (
+        <div className="py-10 text-center text-sm text-text-muted">
+          No assets match current status visibility.
+        </div>
       ) : (
         <div className="divide-y divide-border">
-          {assets.map(asset => {
+          {visibleAssets.map(asset => {
             const Icon = ASSET_TYPE_ICON[asset.type] ?? Package;
             const ws   = warrantyStatus(asset.warrantyEnd);
             return (

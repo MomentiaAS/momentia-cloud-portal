@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
-  Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench,
+  Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench, Camera, Cpu, Lock, ShieldCheck,
   ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2, X,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -30,6 +30,10 @@ const TYPE_META: Record<AssetType, { label: string; icon: React.ElementType }> =
   printer: { label: 'Printer', icon: Printer },
   license_subscription: { label: 'License / Subscription', icon: Package },
   audio_video: { label: 'Audio / Video', icon: Monitor },
+  camera: { label: 'Camera', icon: Camera },
+  iot: { label: 'IoT', icon: Cpu },
+  access_control: { label: 'Access control', icon: Lock },
+  security: { label: 'Security', icon: ShieldCheck },
   home_appliances: { label: 'Home appliances', icon: Home },
   tools: { label: 'Tools', icon: Wrench },
   other: { label: 'Other', icon: Package },
@@ -421,6 +425,10 @@ const ALL_TYPES = [
   'printer',
   'license_subscription',
   'audio_video',
+  'camera',
+  'iot',
+  'access_control',
+  'security',
   'home_appliances',
   'tools',
   'other',

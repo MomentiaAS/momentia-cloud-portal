@@ -474,6 +474,10 @@ create table if not exists public.assets (
                       'printer',
                       'license_subscription',
                       'audio_video',
+                      'camera',
+                      'iot',
+                      'access_control',
+                      'security',
                       'home_appliances',
                       'tools',
                       'other'
@@ -800,6 +804,10 @@ alter table public.assets
       'printer',
       'license_subscription',
       'audio_video',
+      'camera',
+      'iot',
+      'access_control',
+      'security',
       'home_appliances',
       'tools',
       'other'

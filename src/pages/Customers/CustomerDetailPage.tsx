@@ -7,7 +7,7 @@ import {
   Mail, Phone, User as UserIcon,
   Server, Cloud, HardDrive, Globe, ShieldCheck,
   X, ChevronRight, Wifi, WifiOff, Users as UsersIcon,
-  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2, Copy,
+  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2, Copy, Camera, Cpu, Lock,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -133,6 +133,10 @@ const ASSET_TYPE_ICON: Record<string, React.ElementType> = {
   printer: Printer,
   license_subscription: Package,
   audio_video: Globe,
+  camera: Camera,
+  iot: Cpu,
+  access_control: Lock,
+  security: ShieldCheck,
   home_appliances: Package,
   tools: Wrench,
   other: Package,
@@ -490,6 +494,10 @@ function BulkAddAssetsModal({
                     <option value="printer">Printer</option>
                     <option value="license_subscription">License / Subscription</option>
                     <option value="audio_video">Audio / Video</option>
+                    <option value="camera">Camera</option>
+                    <option value="iot">IoT</option>
+                    <option value="access_control">Access control</option>
+                    <option value="security">Security</option>
                     <option value="home_appliances">Home appliances</option>
                     <option value="tools">Tools</option>
                     <option value="other">Other</option>

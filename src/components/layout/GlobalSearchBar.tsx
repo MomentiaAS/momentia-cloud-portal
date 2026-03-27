@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Building2, AlertCircle, ChevronRight,
-  Laptop, Server, Network, Smartphone, Printer, Package,
+  Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
 import { useCustomers } from '../../hooks/useCustomers';
@@ -17,12 +17,18 @@ const MAX_PER_GROUP = 6;
 
 const ASSET_ICON: Record<AssetType, React.ElementType> = {
   computer: Laptop,
-  server:   Server,
-  network:  Network,
-  mobile:   Smartphone,
-  printer:  Printer,
-  license:  Package,
-  other:    Package,
+  server: Server,
+  router_firewall: Shield,
+  access_point: Wifi,
+  switch: HardDrive,
+  network_equipment: Network,
+  mobile_device: Smartphone,
+  printer: Printer,
+  license_subscription: Package,
+  audio_video: Monitor,
+  home_appliances: Home,
+  tools: Wrench,
+  other: Package,
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

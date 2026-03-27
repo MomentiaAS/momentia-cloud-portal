@@ -483,7 +483,6 @@ create table if not exists public.assets (
   model         text,
   serial        text,
   os            text,
-  assigned_to   text,
   status        text not null default 'active'
                   check (status in ('active','retired','spare')),
   purchase_date date,
@@ -806,3 +805,8 @@ alter table public.assets
       'other'
     )
   );
+
+-- ── v17 → v18: Remove deprecated asset assignee column ───────────────────────
+
+alter table public.assets
+  drop column if exists assigned_to;

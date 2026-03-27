@@ -46,7 +46,7 @@ type DbBackupJob = {
 type DbAsset = {
   id: string; customer_id: string; name: string; type: string;
   make: string | null; model: string | null; serial: string | null;
-  os: string | null; assigned_to: string | null; status: string;
+  os: string | null; status: string;
   ip_address: string | null; mac_address: string | null; location: string | null;
   purchase_date: string | null; warranty_end: string | null;
   notes: string | null; created_at: string;

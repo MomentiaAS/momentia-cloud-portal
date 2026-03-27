@@ -154,7 +154,7 @@ function warrantyStatus(warrantyEnd?: string): 'expired' | 'soon' | 'ok' | null 
 
 function assetStatusOrder(status: Asset['status']): number {
   if (status === 'active') return 0;
-  if (status === 'spare') return 1; // shown as Passive in filters
+  if (status === 'spare') return 1; // shown as Spare in filters
   return 2; // retired
 }
 
@@ -262,9 +262,9 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
             'h-7 px-2.5 rounded text-xs font-medium transition-colors',
             statusVisible.spare ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : 'text-text-muted hover:text-text-primary',
           )}
-          title={statusVisible.spare ? 'Hide passive' : 'Show passive'}
+          title={statusVisible.spare ? 'Hide spare' : 'Show spare'}
         >
-          Passive
+          Spare
         </button>
         <button
           type="button"

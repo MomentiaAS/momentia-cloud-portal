@@ -462,7 +462,23 @@ create table if not exists public.assets (
   customer_id   uuid not null references public.customers(id) on delete cascade,
   name          text not null,
   type          text not null default 'computer'
-                  check (type in ('computer','server','network','mobile','printer','license','other')),
+                  check (
+                    type in (
+                      'computer',
+                      'server',
+                      'router_firewall',
+                      'access_point',
+                      'switch',
+                      'network_equipment',
+                      'mobile_device',
+                      'printer',
+                      'license_subscription',
+                      'audio_video',
+                      'home_appliances',
+                      'tools',
+                      'other'
+                    )
+                  ),
   make          text,
   model         text,
   serial        text,
@@ -756,3 +772,37 @@ create policy "customer-files delete"
 -- ── No seed data ──────────────────────────────────────────────────────────────
 -- Add real customers via the portal.
 -- Use the portal to add customers, or insert directly via the Supabase dashboard.
+
+-- ── v16 → v17: Expand asset type list ────────────────────────────────────────
+
+update public.assets
+set type = case type
+  when 'network' then 'network_equipment'
+  when 'mobile' then 'mobile_device'
+  when 'license' then 'license_subscription'
+  else type
+end
+where type in ('network', 'mobile', 'license');
+
+alter table public.assets
+  drop constraint if exists assets_type_check;
+
+alter table public.assets
+  add constraint assets_type_check
+  check (
+    type in (
+      'computer',
+      'server',
+      'router_firewall',
+      'access_point',
+      'switch',
+      'network_equipment',
+      'mobile_device',
+      'printer',
+      'license_subscription',
+      'audio_video',
+      'home_appliances',
+      'tools',
+      'other'
+    )
+  );

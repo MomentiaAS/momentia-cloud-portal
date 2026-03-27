@@ -413,7 +413,6 @@ function toAsset(r: DbAsset): Asset {
     model:        r.model       ?? undefined,
     serial:       r.serial      ?? undefined,
     os:           r.os          ?? undefined,
-    assignedTo:   r.assigned_to ?? undefined,
     ipAddress:    r.ip_address  ?? undefined,
     macAddress:   r.mac_address ?? undefined,
     location:     r.location    ?? undefined,
@@ -446,7 +445,7 @@ export async function fetchAllAssets(): Promise<Asset[]> {
 
 export interface AssetPayload {
   name: string; type: string; make?: string; model?: string;
-  serial?: string; os?: string; assignedTo?: string;
+  serial?: string; os?: string;
   ipAddress?: string; macAddress?: string; location?: string;
   status: string; purchaseDate?: string; warrantyEnd?: string; notes?: string;
 }
@@ -462,7 +461,6 @@ export async function insertAsset(customerId: string, p: AssetPayload): Promise<
       model:         p.model         || null,
       serial:        p.serial        || null,
       os:            p.os            || null,
-      assigned_to:   p.assignedTo    || null,
       ip_address:    p.ipAddress     || null,
       mac_address:   p.macAddress    || null,
       location:      p.location      || null,
@@ -487,7 +485,6 @@ export async function updateAsset(id: string, p: AssetPayload): Promise<Asset> {
       model:         p.model         || null,
       serial:        p.serial        || null,
       os:            p.os            || null,
-      assigned_to:   p.assignedTo    || null,
       ip_address:    p.ipAddress     || null,
       mac_address:   p.macAddress    || null,
       location:      p.location      || null,

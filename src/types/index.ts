@@ -77,7 +77,20 @@ export interface BackupJob {
   errorMessage?: string;
 }
 
-export type AssetType   = 'computer' | 'server' | 'network' | 'mobile' | 'printer' | 'license' | 'other';
+export type AssetType =
+  | 'computer'
+  | 'server'
+  | 'router_firewall'
+  | 'access_point'
+  | 'switch'
+  | 'network_equipment'
+  | 'mobile_device'
+  | 'printer'
+  | 'license_subscription'
+  | 'audio_video'
+  | 'home_appliances'
+  | 'tools'
+  | 'other';
 export type AssetStatus = 'active' | 'retired' | 'spare';
 
 /** Technical documentation section for a customer (portal-editable). */
@@ -116,7 +129,6 @@ export interface Asset {
   model?:       string;
   serial?:      string;
   os?:          string;
-  assignedTo?:  string;
   ipAddress?:   string;
   macAddress?:  string;
   location?:    string;

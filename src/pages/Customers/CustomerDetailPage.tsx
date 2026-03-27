@@ -123,8 +123,19 @@ function ContactCard({ title, contact }: { title: string; contact?: { name?: str
 // ── Tab: Assets ───────────────────────────────────────────────────────────────
 
 const ASSET_TYPE_ICON: Record<string, React.ElementType> = {
-  computer: Laptop, server: Server, network: Network,
-  mobile: Smartphone, printer: Printer, license: Package, other: Package,
+  computer: Laptop,
+  server: Server,
+  router_firewall: Shield,
+  access_point: Wifi,
+  switch: HardDrive,
+  network_equipment: Network,
+  mobile_device: Smartphone,
+  printer: Printer,
+  license_subscription: Package,
+  audio_video: Globe,
+  home_appliances: Package,
+  tools: Wrench,
+  other: Package,
 };
 
 const WARRANTY_WARN_DAYS = 90;
@@ -224,7 +235,6 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   <p className="text-xs text-text-muted mt-0.5">
                     {[asset.make, asset.model].filter(Boolean).join(' ')}
                     {asset.serial && <span className="ml-1 font-mono">· {asset.serial}</span>}
-                    {asset.assignedTo && <span> · {asset.assignedTo}</span>}
                   </p>
                   {(asset.os || asset.warrantyEnd || asset.purchaseDate) && (
                     <p className="text-xs text-text-muted mt-0.5">
@@ -295,7 +305,6 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   ['Model', selected.model ?? '—'],
                   ['Serial', selected.serial ?? '—'],
                   ['Operating system', selected.os ?? '—'],
-                  ['Assigned to', selected.assignedTo ?? '—'],
                   ['IP address', selected.ipAddress ?? '—'],
                   ['MAC address', selected.macAddress ?? '—'],
                   ['Location', selected.location ?? '—'],
@@ -339,7 +348,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 
 const BULK_BLANK: AssetPayload = {
   name: '', type: 'computer', make: '', model: '', serial: '',
-  os: '', assignedTo: '', ipAddress: '', macAddress: '', location: '',
+  os: '', ipAddress: '', macAddress: '', location: '',
   status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
 
@@ -424,12 +433,18 @@ function BulkAddAssetsModal({
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <Input placeholder="Name *" value={row.name} onChange={e => patchRow(idx, 'name', e.target.value)} />
                   <select className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary" value={row.type} onChange={e => patchRow(idx, 'type', e.target.value)}>
-                    <option value="computer">Computer / Laptop</option>
+                    <option value="computer">Computer</option>
                     <option value="server">Server</option>
-                    <option value="network">Network Equipment</option>
-                    <option value="mobile">Mobile Device</option>
+                    <option value="router_firewall">Router / Firewall</option>
+                    <option value="access_point">Access point</option>
+                    <option value="switch">Switch</option>
+                    <option value="network_equipment">Network Equipment</option>
+                    <option value="mobile_device">Mobile device</option>
                     <option value="printer">Printer</option>
-                    <option value="license">License / Subscription</option>
+                    <option value="license_subscription">License / Subscription</option>
+                    <option value="audio_video">Audio / Video</option>
+                    <option value="home_appliances">Home appliances</option>
+                    <option value="tools">Tools</option>
                     <option value="other">Other</option>
                   </select>
                   <Input placeholder="Make" value={row.make} onChange={e => patchRow(idx, 'make', e.target.value)} />

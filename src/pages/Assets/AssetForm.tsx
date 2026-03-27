@@ -12,13 +12,19 @@ const inputClass = cn(
 );
 
 const ASSET_TYPES: { value: AssetType; label: string }[] = [
-  { value: 'computer', label: 'Computer / Laptop' },
-  { value: 'server',   label: 'Server' },
-  { value: 'network',  label: 'Network Equipment' },
-  { value: 'mobile',   label: 'Mobile Device' },
-  { value: 'printer',  label: 'Printer' },
-  { value: 'license',  label: 'License / Subscription' },
-  { value: 'other',    label: 'Other' },
+  { value: 'computer', label: 'Computer' },
+  { value: 'server', label: 'Server' },
+  { value: 'router_firewall', label: 'Router / Firewall' },
+  { value: 'access_point', label: 'Access point' },
+  { value: 'switch', label: 'Switch' },
+  { value: 'network_equipment', label: 'Network Equipment' },
+  { value: 'mobile_device', label: 'Mobile device' },
+  { value: 'printer', label: 'Printer' },
+  { value: 'license_subscription', label: 'License / Subscription' },
+  { value: 'audio_video', label: 'Audio / Video' },
+  { value: 'home_appliances', label: 'Home appliances' },
+  { value: 'tools', label: 'Tools' },
+  { value: 'other', label: 'Other' },
 ];
 
 const ASSET_STATUSES: { value: AssetStatus; label: string }[] = [
@@ -29,7 +35,7 @@ const ASSET_STATUSES: { value: AssetStatus; label: string }[] = [
 
 const BLANK: AssetPayload = {
   name: '', type: 'computer', make: '', model: '', serial: '',
-  os: '', assignedTo: '', ipAddress: '', macAddress: '', location: '',
+  os: '', ipAddress: '', macAddress: '', location: '',
   status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
 const ADD_ASSET_DRAFT_KEY = 'momentia:draft:add-asset';
@@ -61,7 +67,6 @@ function toPayload(a: Asset): AssetPayload {
     model:        a.model        ?? '',
     serial:       a.serial       ?? '',
     os:           a.os           ?? '',
-    assignedTo:   a.assignedTo   ?? '',
     ipAddress:    a.ipAddress    ?? '',
     macAddress:   a.macAddress   ?? '',
     location:     a.location     ?? '',

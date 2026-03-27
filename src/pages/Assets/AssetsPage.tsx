@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
-  Laptop, Server, Network, Smartphone, Printer, Package,
+  Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench,
   ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2, X,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -20,13 +20,19 @@ import type { Asset, AssetType } from '../../types';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<AssetType, { label: string; icon: React.ElementType }> = {
-  computer: { label: 'Computer',          icon: Laptop     },
-  server:   { label: 'Server',            icon: Server     },
-  network:  { label: 'Network Equipment', icon: Network    },
-  mobile:   { label: 'Mobile',            icon: Smartphone },
-  printer:  { label: 'Printer',           icon: Printer    },
-  license:  { label: 'License',           icon: Package    },
-  other:    { label: 'Other',             icon: Package    },
+  computer: { label: 'Computer', icon: Laptop },
+  server: { label: 'Server', icon: Server },
+  router_firewall: { label: 'Router / Firewall', icon: Shield },
+  access_point: { label: 'Access point', icon: Wifi },
+  switch: { label: 'Switch', icon: HardDrive },
+  network_equipment: { label: 'Network Equipment', icon: Network },
+  mobile_device: { label: 'Mobile device', icon: Smartphone },
+  printer: { label: 'Printer', icon: Printer },
+  license_subscription: { label: 'License / Subscription', icon: Package },
+  audio_video: { label: 'Audio / Video', icon: Monitor },
+  home_appliances: { label: 'Home appliances', icon: Home },
+  tools: { label: 'Tools', icon: Wrench },
+  other: { label: 'Other', icon: Package },
 };
 
 const WARRANTY_WARN_DAYS = 90;
@@ -105,7 +111,6 @@ function exportToPdf(
         <td>${a.make ?? '—'}</td>
         <td>${a.model ?? '—'}</td>
         <td class="mono">${a.serial ?? '—'}</td>
-        <td>${a.assignedTo ?? '—'}</td>
         <td>${a.location ?? '—'}</td>
         <td class="mono">${a.ipAddress ?? '—'}</td>
         <td class="mono">${a.macAddress ?? '—'}</td>
@@ -147,7 +152,7 @@ function exportToPdf(
     <thead>
       <tr>
         <th>Asset</th><th>Type</th><th>Customer</th><th>Make</th><th>Model</th><th>Serial</th>
-        <th>Assigned To</th><th>Location</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Purchase</th><th>Warranty</th>
+        <th>Location</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Purchase</th><th>Warranty</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -214,7 +219,6 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
     'Make',
     'Model',
     'Serial',
-    'Assigned To',
     'Location',
     'IP Address',
     'MAC Address',
@@ -240,7 +244,6 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
       a.make ?? '—',
       a.model ?? '—',
       a.serial ?? '—',
-      a.assignedTo ?? '—',
       a.location ?? '—',
       a.ipAddress ?? '—',
       a.macAddress ?? '—',
@@ -406,7 +409,22 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ALL_TYPES = ['All', 'computer', 'server', 'network', 'mobile', 'printer', 'license', 'other'] as const;
+const ALL_TYPES = [
+  'All',
+  'computer',
+  'server',
+  'router_firewall',
+  'access_point',
+  'switch',
+  'network_equipment',
+  'mobile_device',
+  'printer',
+  'license_subscription',
+  'audio_video',
+  'home_appliances',
+  'tools',
+  'other',
+] as const;
 
 const COLUMNS: { label: string; key: SortKey }[] = [
   { label: 'Asset',       key: 'name'       },
@@ -543,7 +561,6 @@ export function AssetsPage() {
         (a.make?.toLowerCase().includes(q))      ||
         (a.model?.toLowerCase().includes(q))     ||
         (a.serial?.toLowerCase().includes(q))    ||
-        (a.assignedTo?.toLowerCase().includes(q))||
         (a.ipAddress?.toLowerCase().includes(q)) ||
         (a.macAddress?.toLowerCase().includes(q)) ||
         cName.includes(q)

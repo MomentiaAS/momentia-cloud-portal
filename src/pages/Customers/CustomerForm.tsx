@@ -101,6 +101,7 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
   const [errors,  setErrors]  = useState<Partial<Record<keyof CustomerFormPayload, string>>>({});
   const [saving,  setSaving]  = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [postcodeLookupMsg, setPostcodeLookupMsg] = useState<string | null>(null);
   const isAddMode = !initial;
 
   useEffect(() => {
@@ -148,6 +149,40 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
     writeAddCustomerDraft(form);
   }, [open, isAddMode, form]);
 
+  useEffect(() => {
+    if (!open) return;
+    const postcode = form.postcode.trim();
+    if (!/^\d{4}$/.test(postcode)) {
+      setPostcodeLookupMsg(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          setPostcodeLookupMsg('Looking up city...');
+          const res = await fetch(`https://api.zippopotam.us/no/${postcode}`);
+          if (!res.ok) {
+            setPostcodeLookupMsg('No city found for this postcode.');
+            return;
+          }
+          const data = await res.json() as { places?: Array<{ 'place name'?: string }> };
+          const city = data.places?.[0]?.['place name']?.trim();
+          if (city) {
+            setForm(prev => ({ ...prev, state: city }));
+            setPostcodeLookupMsg('City autofilled.');
+          } else {
+            setPostcodeLookupMsg('No city found for this postcode.');
+          }
+        } catch {
+          setPostcodeLookupMsg('Could not look up city right now.');
+        }
+      })();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [open, form.postcode]);
+
   function validate(): boolean {
     const e: typeof errors = {};
     if (!form.name.trim())         e.name = 'Customer name is required';
@@ -187,6 +222,11 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
 
   const set = <K extends keyof CustomerFormPayload>(key: K, val: CustomerFormPayload[K]) =>
     setForm(prev => ({ ...prev, [key]: val }));
+
+  function handlePostcodeChange(value: string) {
+    const digitsOnly = value.replace(/\D/g, '').slice(0, 4);
+    set('postcode', digitsOnly);
+  }
 
   const Toggle = ({ label, field }: { label: string; field: keyof CustomerFormPayload }) => (
     <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -260,13 +300,16 @@ export function CustomerForm({ open, onClose, onSave, initial }: CustomerFormPro
             <Input
               label="Postcode"
               value={form.postcode}
-              onChange={e => set('postcode', e.target.value)}
+              onChange={e => handlePostcodeChange(e.target.value)}
             />
             <Input
               label="City"
               value={form.state}
               onChange={e => set('state', e.target.value)}
             />
+            {postcodeLookupMsg && (
+              <p className="sm:col-span-2 text-xs text-text-muted">{postcodeLookupMsg}</p>
+            )}
           </div>
         </section>
 

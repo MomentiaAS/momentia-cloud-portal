@@ -7,7 +7,7 @@ import {
   Mail, Phone, User as UserIcon,
   Server, Cloud, HardDrive, Globe, ShieldCheck,
   X, ChevronRight, Wifi, WifiOff, Users as UsersIcon,
-  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2, Copy, Camera, Cpu, Lock,
+  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2, Copy, Cctv, Cpu, Lock,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -133,7 +133,7 @@ const ASSET_TYPE_ICON: Record<string, React.ElementType> = {
   printer: Printer,
   license_subscription: Package,
   audio_video: Globe,
-  camera: Camera,
+  camera: Cctv,
   iot: Cpu,
   access_control: Lock,
   security: ShieldCheck,

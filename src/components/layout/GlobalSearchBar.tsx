@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Building2, AlertCircle, ChevronRight,
-  Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench, Camera, Cpu, Lock, ShieldCheck,
+  Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench, Cctv, Cpu, Lock, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
 import { useCustomers } from '../../hooks/useCustomers';
@@ -26,7 +26,7 @@ const ASSET_ICON: Record<AssetType, React.ElementType> = {
   printer: Printer,
   license_subscription: Package,
   audio_video: Monitor,
-  camera: Camera,
+  camera: Cctv,
   iot: Cpu,
   access_control: Lock,
   security: ShieldCheck,

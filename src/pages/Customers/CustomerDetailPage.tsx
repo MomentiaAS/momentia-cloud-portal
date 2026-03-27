@@ -484,23 +484,23 @@ function BulkAddAssetsModal({
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <Input placeholder="Name *" value={row.name} onChange={e => patchRow(idx, 'name', e.target.value)} />
                   <select className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary" value={row.type} onChange={e => patchRow(idx, 'type', e.target.value)}>
-                    <option value="computer">Computer</option>
-                    <option value="server">Server</option>
-                    <option value="router_firewall">Router / Firewall</option>
                     <option value="access_point">Access point</option>
-                    <option value="switch">Switch</option>
-                    <option value="network_equipment">Network Equipment</option>
-                    <option value="mobile_device">Mobile device</option>
-                    <option value="printer">Printer</option>
-                    <option value="license_subscription">License / Subscription</option>
+                    <option value="access_control">Access control</option>
                     <option value="audio_video">Audio / Video</option>
                     <option value="camera">Camera</option>
-                    <option value="iot">IoT</option>
-                    <option value="access_control">Access control</option>
-                    <option value="security">Security</option>
+                    <option value="computer">Computer</option>
                     <option value="home_appliances">Home appliances</option>
-                    <option value="tools">Tools</option>
+                    <option value="iot">IoT</option>
+                    <option value="license_subscription">License / Subscription</option>
+                    <option value="mobile_device">Mobile device</option>
+                    <option value="network_equipment">Network Equipment</option>
                     <option value="other">Other</option>
+                    <option value="printer">Printer</option>
+                    <option value="router_firewall">Router / Firewall</option>
+                    <option value="security">Security</option>
+                    <option value="server">Server</option>
+                    <option value="switch">Switch</option>
+                    <option value="tools">Tools</option>
                   </select>
                   <Input placeholder="Make" value={row.make} onChange={e => patchRow(idx, 'make', e.target.value)} />
                   <Input placeholder="Model" value={row.model} onChange={e => patchRow(idx, 'model', e.target.value)} />

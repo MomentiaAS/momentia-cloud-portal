@@ -12,23 +12,23 @@ const inputClass = cn(
 );
 
 const ASSET_TYPES: { value: AssetType; label: string }[] = [
-  { value: 'computer', label: 'Computer' },
-  { value: 'server', label: 'Server' },
-  { value: 'router_firewall', label: 'Router / Firewall' },
   { value: 'access_point', label: 'Access point' },
-  { value: 'switch', label: 'Switch' },
-  { value: 'network_equipment', label: 'Network Equipment' },
-  { value: 'mobile_device', label: 'Mobile device' },
-  { value: 'printer', label: 'Printer' },
-  { value: 'license_subscription', label: 'License / Subscription' },
+  { value: 'access_control', label: 'Access control' },
   { value: 'audio_video', label: 'Audio / Video' },
   { value: 'camera', label: 'Camera' },
-  { value: 'iot', label: 'IoT' },
-  { value: 'access_control', label: 'Access control' },
-  { value: 'security', label: 'Security' },
+  { value: 'computer', label: 'Computer' },
   { value: 'home_appliances', label: 'Home appliances' },
-  { value: 'tools', label: 'Tools' },
+  { value: 'iot', label: 'IoT' },
+  { value: 'license_subscription', label: 'License / Subscription' },
+  { value: 'mobile_device', label: 'Mobile device' },
+  { value: 'network_equipment', label: 'Network Equipment' },
   { value: 'other', label: 'Other' },
+  { value: 'printer', label: 'Printer' },
+  { value: 'router_firewall', label: 'Router / Firewall' },
+  { value: 'security', label: 'Security' },
+  { value: 'server', label: 'Server' },
+  { value: 'switch', label: 'Switch' },
+  { value: 'tools', label: 'Tools' },
 ];
 
 const ASSET_STATUSES: { value: AssetStatus; label: string }[] = [

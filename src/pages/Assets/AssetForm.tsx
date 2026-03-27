@@ -82,26 +82,28 @@ interface AssetFormProps {
   onClose:  () => void;
   onSave:   (p: AssetPayload) => Promise<void>;
   initial?: Asset | null;
+  seed?: AssetPayload | null;
 }
 
-export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
+export function AssetForm({ open, onClose, onSave, initial, seed }: AssetFormProps) {
   const [form,  setForm]  = useState<AssetPayload>(BLANK);
   const [busy,  setBusy]  = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isAddMode = !initial;
+  const isSeededAdd = isAddMode && !!seed;
   const formId = 'asset-form';
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? toPayload(initial) : (readAddAssetDraft() ?? BLANK));
+      setForm(initial ? toPayload(initial) : (seed ?? readAddAssetDraft() ?? BLANK));
       setError(null);
     }
-  }, [open, initial]);
+  }, [open, initial, seed]);
 
   useEffect(() => {
-    if (!open || !isAddMode) return;
+    if (!open || !isAddMode || isSeededAdd) return;
     writeAddAssetDraft(form);
-  }, [open, isAddMode, form]);
+  }, [open, isAddMode, isSeededAdd, form]);
 
   if (!open) return null;
 
@@ -116,7 +118,7 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
     setError(null);
     try {
       await onSave(form);
-      if (isAddMode) clearAddAssetDraft();
+      if (isAddMode && !isSeededAdd) clearAddAssetDraft();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save asset.');
@@ -132,7 +134,7 @@ export function AssetForm({ open, onClose, onSave, initial }: AssetFormProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold text-text-primary">
-            {initial ? 'Edit Asset' : 'Add Asset'}
+            {initial ? 'Edit Asset' : isSeededAdd ? 'Clone Asset' : 'Add Asset'}
           </h2>
           <button onClick={onClose} className="p-1 rounded-md text-text-muted hover:text-text-primary focus-ring">
             <X className="size-4" />

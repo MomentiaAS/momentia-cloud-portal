@@ -7,7 +7,7 @@ import {
   Mail, Phone, User as UserIcon,
   Server, Cloud, HardDrive, Globe, ShieldCheck,
   X, ChevronRight, Wifi, WifiOff, Users as UsersIcon,
-  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2,
+  Laptop, Printer, Smartphone, Network, Package, Plus, Trash2, Copy,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
@@ -153,6 +153,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
   const [formOpen,  setFormOpen]  = useState(false);
   const [bulkOpen,  setBulkOpen]  = useState(false);
   const [editing,   setEditing]   = useState<Asset | null>(null);
+  const [cloneSeed, setCloneSeed] = useState<AssetPayload | null>(null);
   const [selected,  setSelected]  = useState<Asset | null>(null);
   const [deleteId,  setDeleteId]  = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -160,6 +161,26 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
   async function handleDelete(id: string) {
     setDeleteBusy(true);
     try { await removeAsset(id); } finally { setDeleteBusy(false); setDeleteId(null); }
+  }
+
+  function cloneFrom(asset: Asset) {
+    setEditing(null);
+    setCloneSeed({
+      name: `${asset.name} (copy)`,
+      type: asset.type,
+      make: asset.make ?? '',
+      model: asset.model ?? '',
+      serial: '',
+      os: asset.os ?? '',
+      ipAddress: '',
+      macAddress: '',
+      location: asset.location ?? '',
+      status: asset.status,
+      purchaseDate: asset.purchaseDate ?? '',
+      warrantyEnd: asset.warrantyEnd ?? '',
+      notes: asset.notes ?? '',
+    });
+    setFormOpen(true);
   }
 
   if (loading) return (
@@ -181,7 +202,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
         {canEdit && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setEditing(null); setFormOpen(true); }}
+              onClick={() => { setEditing(null); setCloneSeed(null); setFormOpen(true); }}
               className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
             >
               <Plus className="size-3.5" /> Add Asset
@@ -200,7 +221,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
         <div className="py-10 text-center text-sm text-text-muted">
           No assets recorded for this customer.
           {canEdit && (
-            <button onClick={() => { setEditing(null); setFormOpen(true); }} className="block mx-auto mt-2 text-accent hover:underline text-xs">
+            <button onClick={() => { setEditing(null); setCloneSeed(null); setFormOpen(true); }} className="block mx-auto mt-2 text-accent hover:underline text-xs">
               Add the first asset
             </button>
           )}
@@ -248,15 +269,25 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setEditing(asset); setFormOpen(true); }}
+                      onClick={(e) => { e.stopPropagation(); setCloneSeed(null); setEditing(asset); setFormOpen(true); }}
                       className="p-1 rounded text-text-muted hover:text-accent transition-colors"
+                      title="Edit asset"
                     >
                       <Pencil className="size-3.5" />
                     </button>
                     <button
                       type="button"
+                      onClick={(e) => { e.stopPropagation(); cloneFrom(asset); }}
+                      className="p-1 rounded text-text-muted hover:text-accent transition-colors"
+                      title="Clone asset"
+                    >
+                      <Copy className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); setDeleteId(asset.id); }}
                       className="p-1 rounded text-text-muted hover:text-red-500 transition-colors"
+                      title="Delete asset"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -323,6 +354,21 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   <p className="text-sm text-text-primary mt-1 whitespace-pre-wrap">{selected.notes}</p>
                 </div>
               )}
+              {canEdit && (
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      cloneFrom(selected);
+                      setSelected(null);
+                    }}
+                  >
+                    <Copy className="size-3.5 mr-1.5" />
+                    Clone asset
+                  </Button>
+                </div>
+              )}
             </div>
           </aside>
         </div>
@@ -330,8 +376,9 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 
       <AssetForm
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={() => { setFormOpen(false); setCloneSeed(null); }}
         initial={editing}
+        seed={cloneSeed}
         onSave={async p => { editing ? await editAsset(editing.id, p) : await addAsset(p); }}
       />
       <BulkAddAssetsModal

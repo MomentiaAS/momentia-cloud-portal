@@ -138,6 +138,7 @@ export function NotificationsPage() {
 
   const customerName = (id: string) => customers.find(c => c.id === id)?.name ?? '—';
   const warrantyAlerts = assets.flatMap(a => {
+    if (a.status !== 'active') return [];
     if (!a.warrantyEnd) return [];
     const days = Math.floor((new Date(a.warrantyEnd).getTime() - Date.now()) / 86_400_000);
     if (days >= 90) return [];

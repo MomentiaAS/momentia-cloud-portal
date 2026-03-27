@@ -32,6 +32,7 @@ export function CriticalAlertsCard({ className }: { className?: string }) {
 
   // Synthetic warranty alerts
   const warrantyAlerts = useMemo(() => assets.flatMap(a => {
+    if (a.status !== 'active') return [];
     const ws = warrantyStatus(a.warrantyEnd);
     if (!ws) return [];
     return [{

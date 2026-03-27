@@ -114,6 +114,7 @@ export function Sidebar({ mobile }: SidebarProps) {
 
   const readWarranty = readWarrantySet();
   const warrantyCount = assets.filter(a => {
+    if (a.status !== 'active') return false;
     if (!a.warrantyEnd) return false;
     const days = Math.floor((new Date(a.warrantyEnd).getTime() - Date.now()) / 86_400_000);
     return days < 90 && !readWarranty.has(`warranty-${a.id}`);

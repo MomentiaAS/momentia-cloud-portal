@@ -589,6 +589,7 @@ export function AssetsPage() {
   }, [assets, typeFilter, statusVisible, customerFilter, query, customerMap, sortKey, sortDir]);
 
   const expiringCount = assets.filter(a => {
+    if (a.status !== 'active') return false;
     const ws = warrantyStatus(a.warrantyEnd);
     return ws === 'expired' || ws === 'soon';
   }).length;

@@ -166,3 +166,17 @@ export interface SupportLink {
   url:   string;
   icon:  string;
 }
+
+export type WorkTimeSource = 'timer' | 'manual';
+
+/** Logged block of work (timer or manual), scoped to the signed-in user in the database. */
+export interface WorkTimeEntry {
+  id:          string;
+  userId:      string;
+  customerId:  string | null;
+  startedAt:   string;
+  endedAt:     string;
+  notes:       string;
+  source:      WorkTimeSource;
+  createdAt:   string;
+}

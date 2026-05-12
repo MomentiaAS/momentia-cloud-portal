@@ -17,6 +17,7 @@ import { SettingsPage }       from './pages/Settings/SettingsPage';
 import { UsersPage }          from './pages/Users/UsersPage';
 import { UnifiSitesPage }     from './pages/UnifiSites/UnifiSitesPage';
 import { AssetsPage }         from './pages/Assets/AssetsPage';
+import { TimeTrackingPage }   from './pages/Time/TimeTrackingPage';
 
 /** Full-screen loader shown while the auth session is being restored. */
 function SplashScreen() {
@@ -90,6 +91,7 @@ function InnerRoutes() {
       <Route path="/users"         element={<UsersPage />} />
       <Route path="/unifi-sites"   element={<UnifiSitesPage />} />
       <Route path="/assets"        element={<AssetsPage />} />
+      <Route path="/time"          element={<TimeTrackingPage />} />
       <Route path="*"              element={<NotFound />} />
     </Routes>
   );

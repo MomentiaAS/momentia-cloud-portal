@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, HeadphonesIcon, ScrollText,
-  DatabaseBackup, Bell, Settings, X, ChevronRight, UserCog, Wifi, Package,
+  DatabaseBackup, Bell, Settings, X, ChevronRight, UserCog, Wifi, Package, Timer,
 } from 'lucide-react';
 import { cn } from '../ui/cn';
 import { CountBadge } from '../ui/Badge';
@@ -50,6 +50,8 @@ const adminNav: NavItem[] = [
   { label: 'UniFi Sites',  to: '/unifi-sites',  icon: Wifi    },
 ];
 
+const timeNavItem: NavItem = { label: 'Time', to: '/time', icon: Timer };
+
 function NavItemRow({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const location = useLocation();
   const isActive =
@@ -93,11 +95,20 @@ export function Sidebar({ mobile }: SidebarProps) {
   const { alerts, reload: reloadAlerts } = useAlerts(false);
   const { assets, reload: reloadAssets } = useAllAssets();
   const canViewUsers  = profile?.role === 'superadmin' || profile?.role === 'admin';
-  const topNavItems = topNav.map(item =>
-    item.to === '/customers' && profile?.role === 'viewer'
-      ? { ...item, label: 'My Services' }
-      : item,
-  );
+  const canTrackTime =
+    profile?.role === 'superadmin' || profile?.role === 'admin' || profile?.role === 'technician';
+
+  const topNavItems = (() => {
+    const base = topNav.map(item =>
+      item.to === '/customers' && profile?.role === 'viewer'
+        ? { ...item, label: 'My Services' }
+        : item,
+    );
+    if (!canTrackTime) return base;
+    const supportIdx = base.findIndex(i => i.to === '/support');
+    const insertAt = supportIdx >= 0 ? supportIdx : base.length;
+    return [...base.slice(0, insertAt), timeNavItem, ...base.slice(insertAt)];
+  })();
 
   const handleNav = () => {
     if (mobile) setSidebarOpen(false);

@@ -12,6 +12,8 @@ import type {
   Asset,
   CustomerDocSection,
   CustomerFileNode,
+  WorkTimeEntry,
+  WorkTimeSource,
 } from '../types';
 import type { Profile } from '../context/AuthContext';
 
@@ -61,6 +63,12 @@ type DbCustomerFile = {
   id: string; customer_id: string; parent_id: string | null; kind: string;
   name: string; storage_path: string | null; mime_type: string | null;
   size_bytes: number | null; created_at: string; created_by: string | null;
+};
+
+type DbWorkTimeEntry = {
+  id: string; user_id: string; customer_id: string | null;
+  started_at: string; ended_at: string; notes: string | null;
+  source: string; created_at: string;
 };
 
 const CUSTOMER_FILES_BUCKET = 'customer-files';
@@ -403,6 +411,19 @@ function toCustomerFile(r: DbCustomerFile): CustomerFileNode {
   };
 }
 
+function toWorkTimeEntry(r: DbWorkTimeEntry): WorkTimeEntry {
+  return {
+    id:          r.id,
+    userId:      r.user_id,
+    customerId:  r.customer_id,
+    startedAt:   r.started_at,
+    endedAt:     r.ended_at,
+    notes:       r.notes ?? '',
+    source:      r.source as WorkTimeSource,
+    createdAt:   r.created_at,
+  };
+}
+
 function toAsset(r: DbAsset): Asset {
   return {
     id:           r.id,
@@ -701,4 +722,83 @@ export async function getCustomerFileSignedUrl(storagePath: string, expiresSec =
   if (error) throw new Error(error.message);
   if (!data?.signedUrl) throw new Error('Could not create download link.');
   return data.signedUrl;
+}
+
+// ── Work time entries (per-user) ──────────────────────────────────────────────
+
+export async function fetchWorkTimeEntriesForUser(): Promise<WorkTimeEntry[]> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('work_time_entries')
+    .select('*')
+    .eq('user_id', uid)
+    .order('started_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data as DbWorkTimeEntry[]).map(toWorkTimeEntry);
+}
+
+export async function insertWorkTimeEntry(payload: {
+  customerId: string | null;
+  startedAt: string;
+  endedAt: string;
+  notes: string;
+  source: WorkTimeSource;
+}): Promise<WorkTimeEntry> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('work_time_entries')
+    .insert({
+      user_id:      uid,
+      customer_id:  payload.customerId,
+      started_at:   payload.startedAt,
+      ended_at:     payload.endedAt,
+      notes:        payload.notes.trim() || null,
+      source:       payload.source,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toWorkTimeEntry(data as DbWorkTimeEntry);
+}
+
+export async function updateWorkTimeEntry(
+  id: string,
+  payload: {
+    customerId?: string | null;
+    startedAt?: string;
+    endedAt?: string;
+    notes?: string;
+  },
+): Promise<WorkTimeEntry> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.user?.id) throw new Error('Not authenticated');
+
+  const row: Record<string, unknown> = {};
+  if ('customerId' in payload) row.customer_id = payload.customerId;
+  if (payload.startedAt != null) row.started_at = payload.startedAt;
+  if (payload.endedAt != null) row.ended_at = payload.endedAt;
+  if (payload.notes != null) row.notes = payload.notes.trim() || null;
+
+  const { data, error } = await supabase
+    .from('work_time_entries')
+    .update(row)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return toWorkTimeEntry(data as DbWorkTimeEntry);
+}
+
+export async function deleteWorkTimeEntry(id: string): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.user?.id) throw new Error('Not authenticated');
+
+  const { error } = await supabase.from('work_time_entries').delete().eq('id', id);
+  if (error) throw new Error(error.message);
 }

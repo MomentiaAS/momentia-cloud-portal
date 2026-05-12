@@ -818,3 +818,35 @@ alter table public.assets
 
 alter table public.assets
   drop column if exists assigned_to;
+
+-- ── v18 → v19: Work time entries (per-user client time tracking) ──────────────
+
+create table if not exists public.work_time_entries (
+  id            uuid primary key default uuid_generate_v4(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  customer_id   uuid references public.customers(id) on delete set null,
+  started_at    timestamptz not null,
+  ended_at      timestamptz not null,
+  notes         text,
+  source        text not null
+                  check (source in ('timer', 'manual')),
+  created_at    timestamptz not null default now(),
+  constraint work_time_entries_duration_ok check (ended_at > started_at)
+);
+
+create index if not exists work_time_entries_user_started_idx
+  on public.work_time_entries (user_id, started_at desc);
+
+alter table public.work_time_entries enable row level security;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where tablename = 'work_time_entries' and policyname = 'Own work time entries'
+  ) then
+    create policy "Own work time entries" on public.work_time_entries
+      for all
+      using (auth.uid() = user_id)
+      with check (auth.uid() = user_id);
+  end if;
+end $$;

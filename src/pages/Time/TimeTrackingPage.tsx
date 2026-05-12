@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
+import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown, Filter } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useWorkTimeEntries } from '../../hooks/useWorkTimeEntries';
@@ -18,6 +18,35 @@ const inputClass = cn(
   'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
   'disabled:opacity-50 transition-colors',
 );
+
+/** In `logCustomerFilterIds`, marks internal (no client) rows. */
+const INTERNAL_CUSTOMER_FILTER_KEY = '__internal__';
+
+function entryDurationMs(e: WorkTimeEntry): number {
+  return Math.max(0, new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime());
+}
+
+function totalDurationMs(rows: WorkTimeEntry[]): number {
+  return rows.reduce((a, e) => a + entryDurationMs(e), 0);
+}
+
+function entryMatchesCustomerFilter(e: WorkTimeEntry, filterIds: string[] | null): boolean {
+  if (filterIds == null) return true;
+  if (filterIds.length === 0) return false;
+  const wantInternal = filterIds.includes(INTERNAL_CUSTOMER_FILTER_KEY);
+  const idSet = new Set(filterIds.filter(x => x !== INTERNAL_CUSTOMER_FILTER_KEY));
+  if (e.customerId == null) return wantInternal;
+  return idSet.has(e.customerId);
+}
+
+function toggleCustomerFilterId(current: string[] | null, id: string): string[] | null {
+  if (current == null) return [id];
+  const next = new Set(current);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  const arr = [...next];
+  return arr.length === 0 ? null : arr;
+}
 
 function localDateInputValue(d = new Date()): string {
   const y = d.getFullYear();
@@ -180,7 +209,9 @@ function exportTimeEntriesToCsv(
     ].map(csvEscape);
   });
   const csv = ['\uFEFF' + header.join(','), ...body.map(r => r.join(','))].join('\n');
-  downloadTextFile(`time_entries_${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
+  const totalMs = totalDurationMs(rows);
+  const totalLine = ['', '', formatDurationMs(totalMs), 'Total (this export)', '', '', '', ''].map(csvEscape).join(',');
+  downloadTextFile(`time_entries_${Date.now()}.csv`, `${csv}\n${totalLine}`, 'text/csv;charset=utf-8');
 }
 
 function exportTimeEntriesToPdf(
@@ -205,6 +236,14 @@ function exportTimeEntriesToPdf(
     })
     .join('');
 
+  const totalMs = totalDurationMs(rows);
+  const totalRow = `
+    <tr class="total">
+      <td colspan="2"></td>
+      <td>${escapeHtml(formatDurationMs(totalMs))}</td>
+      <td colspan="4">Total (this export)</td>
+    </tr>`;
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -220,6 +259,7 @@ function exportTimeEntriesToPdf(
          text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid #d1d5db; }
     td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
     tr:last-child td { border-bottom: none; }
+    tr.total td { border-top: 2px solid #d1d5db; font-weight: 600; }
     @media print { body { padding: 0; } @page { margin: 1.5cm; size: A4 landscape; } }
   </style>
 </head>
@@ -232,7 +272,7 @@ function exportTimeEntriesToPdf(
         <th>Started</th><th>Ended</th><th>Duration</th><th>Client</th><th>Notes</th><th>Source</th><th>Invoiced at</th>
       </tr>
     </thead>
-    <tbody>${tableRows}</tbody>
+    <tbody>${tableRows}${totalRow}</tbody>
   </table>
 </body>
 </html>`;
@@ -297,6 +337,10 @@ export function TimeTrackingPage() {
   const [invoicedSavingId, setInvoicedSavingId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
+  const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
+  const customerFilterRef = useRef<HTMLDivElement | null>(null);
+
+  const [logCustomerFilterIds, setLogCustomerFilterIds] = useState<string[] | null>(null);
 
   const [logSortKey, setLogSortKey] = useState<TimeLogSortKey>('when');
   const [logSortDir, setLogSortDir] = useState<TimeLogSortDir>('desc');
@@ -307,9 +351,21 @@ export function TimeTrackingPage() {
     return m;
   }, [customers]);
 
+  const filteredLogEntries = useMemo(
+    () => entries.filter(e => entryMatchesCustomerFilter(e, logCustomerFilterIds)),
+    [entries, logCustomerFilterIds],
+  );
+
   const sortedLogEntries = useMemo(
-    () => sortWorkTimeEntries(entries, customerNameById, logSortKey, logSortDir),
-    [entries, customerNameById, logSortKey, logSortDir],
+    () => sortWorkTimeEntries(filteredLogEntries, customerNameById, logSortKey, logSortDir),
+    [filteredLogEntries, customerNameById, logSortKey, logSortDir],
+  );
+
+  const logTotalMs = useMemo(() => totalDurationMs(sortedLogEntries), [sortedLogEntries]);
+
+  const customersSorted = useMemo(
+    () => [...customers].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [customers],
   );
 
   const onLogSort = useCallback((next: TimeLogSortKey) => {
@@ -330,9 +386,9 @@ export function TimeTrackingPage() {
 
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setExportOpen(false);
-      }
+      const t = e.target as Node;
+      if (exportRef.current && !exportRef.current.contains(t)) setExportOpen(false);
+      if (customerFilterRef.current && !customerFilterRef.current.contains(t)) setCustomerFilterOpen(false);
     };
     document.addEventListener('mousedown', onMouseDown);
     return () => document.removeEventListener('mousedown', onMouseDown);
@@ -468,7 +524,7 @@ export function TimeTrackingPage() {
               variant="outline"
               size="sm"
               onClick={() => setExportOpen(v => !v)}
-              disabled={loading || entries.length === 0}
+              disabled={loading || sortedLogEntries.length === 0}
               rightIcon={<ChevronDown className="size-3.5" />}
             >
               Export
@@ -701,7 +757,7 @@ export function TimeTrackingPage() {
       <Card>
         <CardHeader
           title="Your log"
-          subtitle="Not invoiced on top; invoiced lines are grayed at the bottom. Click headers to sort within each group."
+          subtitle="Filter by client for totals and export. Not invoiced on top; invoiced lines grayed at the bottom. Sort headers apply within each group."
         />
         <CardBody className="p-0 sm:px-0">
           {loading ? (
@@ -712,69 +768,151 @@ export function TimeTrackingPage() {
           ) : entries.length === 0 ? (
             <p className="px-5 pb-5 text-sm text-text-muted">No entries yet. Use the timers or manual form above.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    <th className="px-3 py-3 w-[8.5rem] font-semibold">Invoiced</th>
-                    <LogSortTh
-                      column="when"
-                      label="When"
-                      currentKey={logSortKey}
-                      currentDir={logSortDir}
-                      onSort={onLogSort}
-                      className="px-5"
-                    />
-                    <LogSortTh
-                      column="duration"
-                      label="Duration"
-                      currentKey={logSortKey}
-                      currentDir={logSortDir}
-                      onSort={onLogSort}
-                      className="px-3"
-                    />
-                    <LogSortTh
-                      column="client"
-                      label="Client"
-                      currentKey={logSortKey}
-                      currentDir={logSortDir}
-                      onSort={onLogSort}
-                      className="px-3"
-                    />
-                    <LogSortTh
-                      column="notes"
-                      label="Notes"
-                      currentKey={logSortKey}
-                      currentDir={logSortDir}
-                      onSort={onLogSort}
-                      className="px-3"
-                    />
-                    <LogSortTh
-                      column="source"
-                      label="Source"
-                      currentKey={logSortKey}
-                      currentDir={logSortDir}
-                      onSort={onLogSort}
-                      className="px-3"
-                    />
-                    <th className="px-5 py-3 w-12" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedLogEntries.map(row => (
-                    <TimeRow
-                      key={row.id}
-                      row={row}
-                      clientName={customerLabel(customerNameById, row.customerId)}
-                      onDelete={() => void handleDelete(row.id)}
-                      deleting={deleteId === row.id}
-                      invoicedSaving={invoicedSavingId === row.id}
-                      onInvoicedChange={invoiced => void handleInvoicedChange(row.id, invoiced)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-3">
+                <div ref={customerFilterRef} className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCustomerFilterOpen(v => !v)}
+                    leftIcon={<Filter className="size-3.5" />}
+                    rightIcon={<ChevronDown className="size-3.5" />}
+                  >
+                    Clients
+                    {logCustomerFilterIds != null && logCustomerFilterIds.length > 0
+                      ? ` (${logCustomerFilterIds.length})`
+                      : ''}
+                  </Button>
+                  {customerFilterOpen && (
+                    <div className="absolute left-0 mt-1 min-w-[14rem] max-w-[min(22rem,85vw)] max-h-72 overflow-y-auto bg-surface-raised border border-border rounded-lg shadow-popover z-30 py-2 px-1 space-y-0.5">
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm text-text-secondary rounded-md hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                        onClick={() => {
+                          setLogCustomerFilterIds(null);
+                          setCustomerFilterOpen(false);
+                        }}
+                      >
+                        Show all clients
+                      </button>
+                      <div className="border-t border-border my-1" />
+                      <label className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer rounded-md hover:bg-primary-100 dark:hover:bg-primary-700/40">
+                        <input
+                          type="checkbox"
+                          className="size-4 rounded border-border text-accent shrink-0"
+                          checked={logCustomerFilterIds?.includes(INTERNAL_CUSTOMER_FILTER_KEY) ?? false}
+                          onChange={() =>
+                            setLogCustomerFilterIds(prev =>
+                              toggleCustomerFilterId(prev, INTERNAL_CUSTOMER_FILTER_KEY),
+                            )
+                          }
+                        />
+                        <span>Internal (no client)</span>
+                      </label>
+                      {customersSorted.map(c => (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer rounded-md hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                        >
+                          <input
+                            type="checkbox"
+                            className="size-4 rounded border-border text-accent shrink-0"
+                            checked={logCustomerFilterIds?.includes(c.id) ?? false}
+                            onChange={() =>
+                              setLogCustomerFilterIds(prev => toggleCustomerFilterId(prev, c.id))
+                            }
+                          />
+                          <span className="truncate">{c.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary">
+                  <span className="font-medium text-text-primary tabular-nums">{formatDurationMs(logTotalMs)}</span>
+                  {' · '}
+                  {sortedLogEntries.length} entr{sortedLogEntries.length !== 1 ? 'ies' : 'y'}
+                  {logCustomerFilterIds != null && logCustomerFilterIds.length > 0 && (
+                    <span className="text-text-muted"> (filtered)</span>
+                  )}
+                </p>
+                {logCustomerFilterIds != null && (
+                  <Button variant="ghost" size="sm" onClick={() => setLogCustomerFilterIds(null)}>
+                    Clear client filter
+                  </Button>
+                )}
+              </div>
+              {sortedLogEntries.length === 0 ? (
+                <p className="px-5 py-8 text-sm text-text-muted text-center">
+                  No entries match the current client selection. Change the checkboxes under Clients or choose
+                  &quot;Show all clients&quot;.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
+                        <th className="px-3 py-3 w-[8.5rem] font-semibold">Invoiced</th>
+                        <LogSortTh
+                          column="when"
+                          label="When"
+                          currentKey={logSortKey}
+                          currentDir={logSortDir}
+                          onSort={onLogSort}
+                          className="px-5"
+                        />
+                        <LogSortTh
+                          column="duration"
+                          label="Duration"
+                          currentKey={logSortKey}
+                          currentDir={logSortDir}
+                          onSort={onLogSort}
+                          className="px-3"
+                        />
+                        <LogSortTh
+                          column="client"
+                          label="Client"
+                          currentKey={logSortKey}
+                          currentDir={logSortDir}
+                          onSort={onLogSort}
+                          className="px-3"
+                        />
+                        <LogSortTh
+                          column="notes"
+                          label="Notes"
+                          currentKey={logSortKey}
+                          currentDir={logSortDir}
+                          onSort={onLogSort}
+                          className="px-3"
+                        />
+                        <LogSortTh
+                          column="source"
+                          label="Source"
+                          currentKey={logSortKey}
+                          currentDir={logSortDir}
+                          onSort={onLogSort}
+                          className="px-3"
+                        />
+                        <th className="px-5 py-3 w-12" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedLogEntries.map(row => (
+                        <TimeRow
+                          key={row.id}
+                          row={row}
+                          clientName={customerLabel(customerNameById, row.customerId)}
+                          onDelete={() => void handleDelete(row.id)}
+                          deleting={deleteId === row.id}
+                          invoicedSaving={invoicedSavingId === row.id}
+                          onInvoicedChange={invoiced => void handleInvoicedChange(row.id, invoiced)}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </CardBody>
       </Card>

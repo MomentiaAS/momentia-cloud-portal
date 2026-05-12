@@ -1,11 +1,11 @@
-import { useMemo, useState, useCallback, type FormEvent } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Trash2 } from 'lucide-react';
+import { AlertCircle, Trash2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useWorkTimeEntries } from '../../hooks/useWorkTimeEntries';
-import { useActiveWorkTimer } from '../../hooks/useActiveWorkTimer';
+import { useActiveWorkTimer, type TimerSlotIndex } from '../../hooks/useActiveWorkTimer';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -44,6 +44,177 @@ function customerLabel(map: Map<string, string>, customerId: string | null): str
   return map.get(customerId) ?? '—';
 }
 
+function manualWindowFromTimes(
+  workDate: string,
+  startTime: string,
+  endTime: string,
+):
+  | { ok: true; hours: number; minutes: number; startedAt: string; endedAt: string }
+  | { ok: false; message: string } {
+  const localStart = new Date(`${workDate}T${startTime}:00`);
+  let localEnd = new Date(`${workDate}T${endTime}:00`);
+  if (Number.isNaN(localStart.getTime()) || Number.isNaN(localEnd.getTime())) {
+    return { ok: false, message: 'Invalid date or time.' };
+  }
+  if (localEnd.getTime() === localStart.getTime()) {
+    return { ok: false, message: 'Start and end time must differ.' };
+  }
+  if (localEnd.getTime() < localStart.getTime()) {
+    localEnd = new Date(localEnd.getTime() + 24 * 60 * 60 * 1000);
+  }
+  const ms = localEnd.getTime() - localStart.getTime();
+  const totalMin = Math.round(ms / 60_000);
+  if (totalMin <= 0) {
+    return { ok: false, message: 'End time must be after start time (same day, or end past midnight).' };
+  }
+  return {
+    ok: true,
+    hours: Math.floor(totalMin / 60),
+    minutes: totalMin % 60,
+    startedAt: localStart.toISOString(),
+    endedAt: localEnd.toISOString(),
+  };
+}
+
+function csvEscape(v: unknown): string {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadTextFile(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function exportTimeEntriesToCsv(
+  rows: WorkTimeEntry[],
+  customerNameById: Map<string, string>,
+) {
+  const sorted = [...rows].sort(
+    (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
+  );
+  const header = ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source'];
+  const body = sorted.map(e => {
+    const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
+    return [
+      format(new Date(e.startedAt), 'yyyy-MM-dd HH:mm'),
+      format(new Date(e.endedAt), 'yyyy-MM-dd HH:mm'),
+      formatDurationMs(dur),
+      customerLabel(customerNameById, e.customerId),
+      e.notes,
+      e.source,
+    ].map(csvEscape);
+  });
+  const csv = ['\uFEFF' + header.join(','), ...body.map(r => r.join(','))].join('\n');
+  downloadTextFile(`time_entries_${Date.now()}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
+function exportTimeEntriesToPdf(
+  rows: WorkTimeEntry[],
+  customerNameById: Map<string, string>,
+) {
+  const sorted = [...rows].sort(
+    (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
+  );
+  const now = new Date().toLocaleString();
+  const tableRows = sorted
+    .map(e => {
+      const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
+      const client = escapeHtml(customerLabel(customerNameById, e.customerId));
+      return `
+    <tr>
+      <td>${escapeHtml(format(new Date(e.startedAt), 'yyyy-MM-dd HH:mm'))}</td>
+      <td>${escapeHtml(format(new Date(e.endedAt), 'yyyy-MM-dd HH:mm'))}</td>
+      <td>${escapeHtml(formatDurationMs(dur))}</td>
+      <td>${client}</td>
+      <td>${escapeHtml(e.notes)}</td>
+      <td>${escapeHtml(e.source)}</td>
+    </tr>`;
+    })
+    .join('');
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Time entries — ${escapeHtml(now)}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 24px; }
+    h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .meta { font-size: 10px; color: #666; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 10px;
+         text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid #d1d5db; }
+    td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    @media print { body { padding: 0; } @page { margin: 1.5cm; size: A4 landscape; } }
+  </style>
+</head>
+<body>
+  <h1>Time entries</h1>
+  <p class="meta">Exported ${escapeHtml(now)} · ${sorted.length} entr${sorted.length !== 1 ? 'ies' : 'y'}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Started</th><th>Ended</th><th>Duration</th><th>Client</th><th>Notes</th><th>Source</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+</body>
+</html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  const win = iframe.contentWindow;
+  if (!doc || !win) {
+    iframe.remove();
+    window.alert('PDF export blocked by the browser.');
+    return;
+  }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      setTimeout(() => iframe.remove(), 500);
+    }
+  }, 150);
+}
+
+type TimerDraft = { customer: string; notes: string };
+
 export function TimeTrackingPage() {
   const { profile } = useAuth();
   const { customers, loading: customersLoading } = useCustomers();
@@ -51,21 +222,24 @@ export function TimeTrackingPage() {
     useWorkTimeEntries();
   const timer = useActiveWorkTimer();
 
-  const [timerCustomer, setTimerCustomer] = useState<string>('');
-  const [timerNotes, setTimerNotes] = useState('');
+  const [timerDrafts, setTimerDrafts] = useState<[TimerDraft, TimerDraft]>([
+    { customer: '', notes: '' },
+    { customer: '', notes: '' },
+  ]);
   const [timerActionError, setTimerActionError] = useState<string | null>(null);
-  const [timerBusy, setTimerBusy] = useState(false);
+  const [timerBusySlot, setTimerBusySlot] = useState<TimerSlotIndex | null>(null);
 
   const [manualDate, setManualDate] = useState(() => localDateInputValue());
   const [manualStartTime, setManualStartTime] = useState('09:00');
-  const [manualHours, setManualHours] = useState('1');
-  const [manualMinutes, setManualMinutes] = useState('0');
+  const [manualEndTime, setManualEndTime] = useState('10:00');
   const [manualCustomer, setManualCustomer] = useState<string>('');
   const [manualNotes, setManualNotes] = useState('');
   const [manualBusy, setManualBusy] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement | null>(null);
 
   const customerNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -73,70 +247,86 @@ export function TimeTrackingPage() {
     return m;
   }, [customers]);
 
-  const handleStartTimer = useCallback(() => {
-    setTimerActionError(null);
-    const cid = timerCustomer === '' ? null : timerCustomer;
-    if (!timer.start(cid, timerNotes)) {
-      setTimerActionError('A timer is already running.');
-    }
-  }, [timer, timerCustomer, timerNotes]);
+  const manualDerived = useMemo(
+    () => manualWindowFromTimes(manualDate, manualStartTime, manualEndTime),
+    [manualDate, manualStartTime, manualEndTime],
+  );
 
-  const handleStopTimer = useCallback(async () => {
-    if (!timer.active) return;
-    const { customerId, startedAtIso, notes } = timer.active;
-    const endedAtIso = new Date().toISOString();
-    if (new Date(endedAtIso).getTime() <= new Date(startedAtIso).getTime()) {
-      setTimerActionError('Invalid timer range.');
-      return;
-    }
-    setTimerBusy(true);
-    setTimerActionError(null);
-    try {
-      await addEntry({
-        customerId,
-        startedAt: startedAtIso,
-        endedAt: endedAtIso,
-        notes,
-        source: 'timer',
-      });
-      timer.discard();
-    } catch (e) {
-      setTimerActionError(e instanceof Error ? e.message : 'Could not save entry.');
-    } finally {
-      setTimerBusy(false);
-    }
-  }, [timer, addEntry]);
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, []);
+
+  const setDraft = useCallback((slot: TimerSlotIndex, patch: Partial<TimerDraft>) => {
+    setTimerDrafts(prev => {
+      const next: [TimerDraft, TimerDraft] = [{ ...prev[0] }, { ...prev[1] }];
+      next[slot] = { ...next[slot], ...patch };
+      return next;
+    });
+  }, []);
+
+  const handleStartTimer = useCallback(
+    (slot: TimerSlotIndex) => {
+      setTimerActionError(null);
+      const d = timerDrafts[slot];
+      const cid = d.customer === '' ? null : d.customer;
+      if (!timer.start(slot, cid, d.notes)) {
+        setTimerActionError(`Timer ${slot + 1} is already running.`);
+      }
+    },
+    [timer, timerDrafts],
+  );
+
+  const handleStopTimer = useCallback(
+    async (slot: TimerSlotIndex) => {
+      const active = timer.slots[slot];
+      if (!active) return;
+      const { customerId, startedAtIso, notes } = active;
+      const endedAtIso = new Date().toISOString();
+      if (new Date(endedAtIso).getTime() <= new Date(startedAtIso).getTime()) {
+        setTimerActionError('Invalid timer range.');
+        return;
+      }
+      setTimerBusySlot(slot);
+      setTimerActionError(null);
+      try {
+        await addEntry({
+          customerId,
+          startedAt: startedAtIso,
+          endedAt: endedAtIso,
+          notes,
+          source: 'timer',
+        });
+        timer.discard(slot);
+      } catch (e) {
+        setTimerActionError(e instanceof Error ? e.message : 'Could not save entry.');
+      } finally {
+        setTimerBusySlot(null);
+      }
+    },
+    [timer, addEntry],
+  );
 
   const handleManualSubmit = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
       setManualError(null);
-      const h = Number.parseInt(manualHours, 10);
-      const min = Number.parseInt(manualMinutes, 10);
-      if (Number.isNaN(h) || Number.isNaN(min) || h < 0 || min < 0 || min > 59) {
-        setManualError('Enter a valid duration (hours ≥ 0, minutes 0–59).');
+      if (!manualDerived.ok) {
+        setManualError(manualDerived.message);
         return;
       }
-      const durationMin = h * 60 + min;
-      if (durationMin <= 0) {
-        setManualError('Duration must be greater than zero.');
-        return;
-      }
-
-      const localStart = new Date(`${manualDate}T${manualStartTime}:00`);
-      if (Number.isNaN(localStart.getTime())) {
-        setManualError('Invalid date or start time.');
-        return;
-      }
-      const startedAt = localStart.toISOString();
-      const endedAt = new Date(localStart.getTime() + durationMin * 60_000).toISOString();
 
       setManualBusy(true);
       try {
         await addEntry({
           customerId: manualCustomer === '' ? null : manualCustomer,
-          startedAt,
-          endedAt,
+          startedAt: manualDerived.startedAt,
+          endedAt: manualDerived.endedAt,
           notes: manualNotes,
           source: 'manual',
         });
@@ -148,7 +338,7 @@ export function TimeTrackingPage() {
         setManualBusy(false);
       }
     },
-    [manualDate, manualStartTime, manualHours, manualMinutes, manualCustomer, manualNotes, addEntry],
+    [manualDerived, manualCustomer, manualNotes, addEntry],
   );
 
   const handleDelete = useCallback(
@@ -178,12 +368,50 @@ export function TimeTrackingPage() {
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Time</h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            Track time per client with a timer or manual entries. Times use your computer&apos;s local timezone.
+            Up to two live timers; manual entries from start and end time. Times use your computer&apos;s local
+            timezone.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}>
-          Refresh list
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div ref={exportRef} className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(v => !v)}
+              disabled={loading || entries.length === 0}
+              rightIcon={<ChevronDown className="size-3.5" />}
+            >
+              Export
+            </Button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => {
+                    exportTimeEntriesToPdf(entries, customerNameById);
+                    setExportOpen(false);
+                  }}
+                >
+                  Export to PDF
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                  onClick={() => {
+                    exportTimeEntriesToCsv(entries, customerNameById);
+                    setExportOpen(false);
+                  }}
+                >
+                  Export to CSV
+                </button>
+              </div>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}>
+            Refresh list
+          </Button>
+        </div>
       </div>
 
       {(entriesError || timerActionError) && (
@@ -198,74 +426,88 @@ export function TimeTrackingPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader
-            title="Timer"
-            subtitle={timer.isRunning ? 'Running — stop to save to your log' : 'Start when you begin work'}
-          />
-          <CardBody className="space-y-4">
-            {timer.isRunning ? (
-              <>
-                <div className="rounded-lg bg-primary-100/80 dark:bg-primary-900/30 px-4 py-6 text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Elapsed</p>
-                  <p className="text-3xl font-mono font-semibold text-text-primary tabular-nums mt-1">
-                    {formatDurationMs(timer.elapsedMs)}
-                  </p>
-                  <p className="text-xs text-text-secondary mt-2">
-                    {customerLabel(customerNameById, timer.active!.customerId)}
-                    {timer.active!.notes ? ` · ${timer.active!.notes}` : ''}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="primary" onClick={() => void handleStopTimer()} loading={timerBusy}>
-                    Stop &amp; save
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      if (window.confirm('Discard this timer without saving?')) timer.discard();
-                    }}
-                    disabled={timerBusy}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="timer-customer">
-                    Client
-                  </label>
-                  <select
-                    id="timer-customer"
-                    className={inputClass}
-                    value={timerCustomer}
-                    onChange={e => setTimerCustomer(e.target.value)}
-                  >
-                    <option value="">No client / internal</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Input
-                  label="Notes (optional)"
-                  placeholder="What are you working on?"
-                  value={timerNotes}
-                  onChange={e => setTimerNotes(e.target.value)}
-                />
-                <Button variant="primary" onClick={handleStartTimer}>
-                  Start timer
-                </Button>
-              </>
-            )}
+          <CardHeader title="Timers" subtitle="Run up to two at once — each saves separately" />
+          <CardBody className="grid gap-6 md:grid-cols-2 md:divide-x md:divide-border">
+            {([0, 1] as const).map(slot => (
+              <div
+                key={slot}
+                className={cn('space-y-4', slot === 0 ? 'md:pr-6' : 'md:pl-6')}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Timer {slot + 1}</p>
+                {timer.slots[slot] ? (
+                  <>
+                    <div className="rounded-lg bg-primary-100/80 dark:bg-primary-900/30 px-3 py-4 text-center">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Elapsed</p>
+                      <p className="text-2xl font-mono font-semibold text-text-primary tabular-nums mt-1">
+                        {formatDurationMs(timer.elapsedMsPair[slot])}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-2 line-clamp-2">
+                        {customerLabel(customerNameById, timer.slots[slot]!.customerId)}
+                        {timer.slots[slot]!.notes ? ` · ${timer.slots[slot]!.notes}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => void handleStopTimer(slot)}
+                        loading={timerBusySlot === slot}
+                      >
+                        Stop &amp; save
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (window.confirm(`Discard timer ${slot + 1} without saving?`)) timer.discard(slot);
+                        }}
+                        disabled={timerBusySlot === slot}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label
+                        className="block text-xs font-medium text-text-secondary mb-1"
+                        htmlFor={`timer-${slot}-customer`}
+                      >
+                        Client
+                      </label>
+                      <select
+                        id={`timer-${slot}-customer`}
+                        className={inputClass}
+                        value={timerDrafts[slot].customer}
+                        onChange={e => setDraft(slot, { customer: e.target.value })}
+                      >
+                        <option value="">No client / internal</option>
+                        {customers.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <Input
+                      label="Notes (optional)"
+                      placeholder="What are you working on?"
+                      value={timerDrafts[slot].notes}
+                      onChange={e => setDraft(slot, { notes: e.target.value })}
+                    />
+                    <Button variant="primary" size="sm" onClick={() => handleStartTimer(slot)}>
+                      Start timer
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))}
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader title="Manual entry" subtitle="Log time after the fact" />
+          <CardHeader title="Manual entry" subtitle="Set start and end time — duration updates automatically" />
           <CardBody>
             <form onSubmit={handleManualSubmit} className="space-y-4">
               {manualError && (
@@ -274,7 +516,7 @@ export function TimeTrackingPage() {
                   {manualError}
                 </p>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="manual-date">
                     Work date
@@ -301,26 +543,39 @@ export function TimeTrackingPage() {
                     required
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="manual-end">
+                    End time
+                  </label>
+                  <input
+                    id="manual-end"
+                    type="time"
+                    className={inputClass}
+                    value={manualEndTime}
+                    onChange={e => setManualEndTime(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input
-                  label="Hours"
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={manualHours}
-                  onChange={e => setManualHours(e.target.value)}
+                  label="Hours (from times)"
+                  type="text"
+                  readOnly
+                  disabled
+                  value={manualDerived.ok ? String(manualDerived.hours) : '—'}
                 />
                 <Input
-                  label="Minutes"
-                  type="number"
-                  min={0}
-                  max={59}
-                  step={1}
-                  value={manualMinutes}
-                  onChange={e => setManualMinutes(e.target.value)}
+                  label="Minutes (from times)"
+                  type="text"
+                  readOnly
+                  disabled
+                  value={manualDerived.ok ? String(manualDerived.minutes) : '—'}
                 />
               </div>
+              {!manualDerived.ok && (
+                <p className="text-xs text-text-muted">{manualDerived.message}</p>
+              )}
               <div>
                 <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="manual-customer">
                   Client
@@ -345,7 +600,7 @@ export function TimeTrackingPage() {
                 value={manualNotes}
                 onChange={e => setManualNotes(e.target.value)}
               />
-              <Button type="submit" variant="secondary" loading={manualBusy}>
+              <Button type="submit" variant="secondary" loading={manualBusy} disabled={!manualDerived.ok}>
                 Add entry
               </Button>
             </form>
@@ -362,7 +617,7 @@ export function TimeTrackingPage() {
               <SkeletonCard />
             </div>
           ) : entries.length === 0 ? (
-            <p className="px-5 pb-5 text-sm text-text-muted">No entries yet. Use the timer or manual form above.</p>
+            <p className="px-5 pb-5 text-sm text-text-muted">No entries yet. Use the timers or manual form above.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

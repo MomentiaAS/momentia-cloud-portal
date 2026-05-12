@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Trash2, ChevronDown } from 'lucide-react';
+import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useWorkTimeEntries } from '../../hooks/useWorkTimeEntries';
@@ -42,6 +42,46 @@ function isStaffRole(role: string | undefined): boolean {
 function customerLabel(map: Map<string, string>, customerId: string | null): string {
   if (customerId == null) return 'Internal';
   return map.get(customerId) ?? '—';
+}
+
+type TimeLogSortKey = 'when' | 'duration' | 'client' | 'notes' | 'source';
+type TimeLogSortDir = 'asc' | 'desc';
+
+function sortWorkTimeEntries(
+  list: WorkTimeEntry[],
+  customerNameById: Map<string, string>,
+  sortKey: TimeLogSortKey,
+  sortDir: TimeLogSortDir,
+): WorkTimeEntry[] {
+  const dir = sortDir === 'asc' ? 1 : -1;
+  return [...list].sort((a, b) => {
+    let cmp = 0;
+    switch (sortKey) {
+      case 'when':
+        cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+        break;
+      case 'duration': {
+        const da = new Date(a.endedAt).getTime() - new Date(a.startedAt).getTime();
+        const db = new Date(b.endedAt).getTime() - new Date(b.startedAt).getTime();
+        cmp = da - db;
+        break;
+      }
+      case 'client':
+        cmp = customerLabel(customerNameById, a.customerId).localeCompare(
+          customerLabel(customerNameById, b.customerId),
+          undefined,
+          { sensitivity: 'base' },
+        );
+        break;
+      case 'notes':
+        cmp = (a.notes || '').localeCompare(b.notes || '', undefined, { sensitivity: 'base' });
+        break;
+      case 'source':
+        cmp = a.source.localeCompare(b.source);
+        break;
+    }
+    return dir * cmp;
+  });
 }
 
 function manualWindowFromTimes(
@@ -106,11 +146,8 @@ function exportTimeEntriesToCsv(
   rows: WorkTimeEntry[],
   customerNameById: Map<string, string>,
 ) {
-  const sorted = [...rows].sort(
-    (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-  );
   const header = ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source'];
-  const body = sorted.map(e => {
+  const body = rows.map(e => {
     const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
     return [
       format(new Date(e.startedAt), 'yyyy-MM-dd HH:mm'),
@@ -129,11 +166,8 @@ function exportTimeEntriesToPdf(
   rows: WorkTimeEntry[],
   customerNameById: Map<string, string>,
 ) {
-  const sorted = [...rows].sort(
-    (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-  );
   const now = new Date().toLocaleString();
-  const tableRows = sorted
+  const tableRows = rows
     .map(e => {
       const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
       const client = escapeHtml(customerLabel(customerNameById, e.customerId));
@@ -169,7 +203,7 @@ function exportTimeEntriesToPdf(
 </head>
 <body>
   <h1>Time entries</h1>
-  <p class="meta">Exported ${escapeHtml(now)} · ${sorted.length} entr${sorted.length !== 1 ? 'ies' : 'y'}</p>
+  <p class="meta">Exported ${escapeHtml(now)} · ${rows.length} entr${rows.length !== 1 ? 'ies' : 'y'}</p>
   <table>
     <thead>
       <tr>
@@ -241,11 +275,30 @@ export function TimeTrackingPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
 
+  const [logSortKey, setLogSortKey] = useState<TimeLogSortKey>('when');
+  const [logSortDir, setLogSortDir] = useState<TimeLogSortDir>('desc');
+
   const customerNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of customers) m.set(c.id, c.name);
     return m;
   }, [customers]);
+
+  const sortedLogEntries = useMemo(
+    () => sortWorkTimeEntries(entries, customerNameById, logSortKey, logSortDir),
+    [entries, customerNameById, logSortKey, logSortDir],
+  );
+
+  const onLogSort = useCallback((next: TimeLogSortKey) => {
+    setLogSortKey(prevKey => {
+      if (prevKey === next) {
+        setLogSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+        return prevKey;
+      }
+      setLogSortDir('asc');
+      return next;
+    });
+  }, []);
 
   const manualDerived = useMemo(
     () => manualWindowFromTimes(manualDate, manualStartTime, manualEndTime),
@@ -389,7 +442,7 @@ export function TimeTrackingPage() {
                   type="button"
                   className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
                   onClick={() => {
-                    exportTimeEntriesToPdf(entries, customerNameById);
+                    exportTimeEntriesToPdf(sortedLogEntries, customerNameById);
                     setExportOpen(false);
                   }}
                 >
@@ -399,7 +452,7 @@ export function TimeTrackingPage() {
                   type="button"
                   className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
                   onClick={() => {
-                    exportTimeEntriesToCsv(entries, customerNameById);
+                    exportTimeEntriesToCsv(sortedLogEntries, customerNameById);
                     setExportOpen(false);
                   }}
                 >
@@ -609,7 +662,7 @@ export function TimeTrackingPage() {
       </div>
 
       <Card>
-        <CardHeader title="Your log" subtitle="Newest first" />
+        <CardHeader title="Your log" subtitle="Click column headers to sort" />
         <CardBody className="p-0 sm:px-0">
           {loading ? (
             <div className="px-5 pb-5 space-y-2">
@@ -623,16 +676,51 @@ export function TimeTrackingPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    <th className="px-5 py-3">When</th>
-                    <th className="px-3 py-3">Duration</th>
-                    <th className="px-3 py-3">Client</th>
-                    <th className="px-3 py-3">Notes</th>
-                    <th className="px-3 py-3">Source</th>
+                    <LogSortTh
+                      column="when"
+                      label="When"
+                      currentKey={logSortKey}
+                      currentDir={logSortDir}
+                      onSort={onLogSort}
+                      className="px-5"
+                    />
+                    <LogSortTh
+                      column="duration"
+                      label="Duration"
+                      currentKey={logSortKey}
+                      currentDir={logSortDir}
+                      onSort={onLogSort}
+                      className="px-3"
+                    />
+                    <LogSortTh
+                      column="client"
+                      label="Client"
+                      currentKey={logSortKey}
+                      currentDir={logSortDir}
+                      onSort={onLogSort}
+                      className="px-3"
+                    />
+                    <LogSortTh
+                      column="notes"
+                      label="Notes"
+                      currentKey={logSortKey}
+                      currentDir={logSortDir}
+                      onSort={onLogSort}
+                      className="px-3"
+                    />
+                    <LogSortTh
+                      column="source"
+                      label="Source"
+                      currentKey={logSortKey}
+                      currentDir={logSortDir}
+                      onSort={onLogSort}
+                      className="px-3"
+                    />
                     <th className="px-5 py-3 w-12" />
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map(row => (
+                  {sortedLogEntries.map(row => (
                     <TimeRow
                       key={row.id}
                       row={row}
@@ -648,6 +736,41 @@ export function TimeTrackingPage() {
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+function LogSortTh({
+  column,
+  label,
+  currentKey,
+  currentDir,
+  onSort,
+  className,
+}: {
+  column: TimeLogSortKey;
+  label: string;
+  currentKey: TimeLogSortKey;
+  currentDir: TimeLogSortDir;
+  onSort: (k: TimeLogSortKey) => void;
+  className?: string;
+}) {
+  const active = currentKey === column;
+  return (
+    <th className={cn('py-3', className)}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          'inline-flex items-center gap-1.5 transition-colors text-left w-full',
+          active ? 'text-accent' : 'text-text-muted hover:text-text-primary',
+        )}
+      >
+        <span>{label}</span>
+        {active
+          ? (currentDir === 'asc' ? <ChevronUp className="size-3 shrink-0" /> : <ChevronDown className="size-3 shrink-0" />)
+          : <ChevronsUpDown className="size-3 shrink-0 opacity-60" />}
+      </button>
+    </th>
   );
 }
 

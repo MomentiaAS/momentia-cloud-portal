@@ -69,6 +69,7 @@ type DbWorkTimeEntry = {
   id: string; user_id: string; customer_id: string | null;
   started_at: string; ended_at: string; notes: string | null;
   source: string; created_at: string;
+  invoiced_at?: string | null;
 };
 
 const CUSTOMER_FILES_BUCKET = 'customer-files';
@@ -421,6 +422,7 @@ function toWorkTimeEntry(r: DbWorkTimeEntry): WorkTimeEntry {
     notes:       r.notes ?? '',
     source:      r.source as WorkTimeSource,
     createdAt:   r.created_at,
+    invoicedAt:  r.invoiced_at ?? null,
   };
 }
 
@@ -774,6 +776,8 @@ export async function updateWorkTimeEntry(
     startedAt?: string;
     endedAt?: string;
     notes?: string;
+    /** Pass `null` to clear invoiced state, or an ISO string to set when invoiced. */
+    invoicedAt?: string | null;
   },
 ): Promise<WorkTimeEntry> {
   const { data: sessionData } = await supabase.auth.getSession();
@@ -784,6 +788,9 @@ export async function updateWorkTimeEntry(
   if (payload.startedAt != null) row.started_at = payload.startedAt;
   if (payload.endedAt != null) row.ended_at = payload.endedAt;
   if (payload.notes != null) row.notes = payload.notes.trim() || null;
+  if ('invoicedAt' in payload) row.invoiced_at = payload.invoicedAt;
+
+  if (Object.keys(row).length === 0) throw new Error('No changes');
 
   const { data, error } = await supabase
     .from('work_time_entries')

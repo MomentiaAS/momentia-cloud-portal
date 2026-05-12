@@ -179,4 +179,6 @@ export interface WorkTimeEntry {
   notes:       string;
   source:      WorkTimeSource;
   createdAt:   string;
+  /** Set when the line has been invoiced to the customer (server stores timestamptz). */
+  invoicedAt:  string | null;
 }

@@ -47,6 +47,42 @@ function customerLabel(map: Map<string, string>, customerId: string | null): str
 type TimeLogSortKey = 'when' | 'duration' | 'client' | 'notes' | 'source';
 type TimeLogSortDir = 'asc' | 'desc';
 
+function compareLogRows(
+  a: WorkTimeEntry,
+  b: WorkTimeEntry,
+  customerNameById: Map<string, string>,
+  sortKey: TimeLogSortKey,
+  dir: number,
+): number {
+  let cmp = 0;
+  switch (sortKey) {
+    case 'when':
+      cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+      break;
+    case 'duration': {
+      const da = new Date(a.endedAt).getTime() - new Date(a.startedAt).getTime();
+      const db = new Date(b.endedAt).getTime() - new Date(b.startedAt).getTime();
+      cmp = da - db;
+      break;
+    }
+    case 'client':
+      cmp = customerLabel(customerNameById, a.customerId).localeCompare(
+        customerLabel(customerNameById, b.customerId),
+        undefined,
+        { sensitivity: 'base' },
+      );
+      break;
+    case 'notes':
+      cmp = (a.notes || '').localeCompare(b.notes || '', undefined, { sensitivity: 'base' });
+      break;
+    case 'source':
+      cmp = a.source.localeCompare(b.source);
+      break;
+  }
+  return dir * cmp;
+}
+
+/** Not invoiced first (normal), invoiced last (grayed in UI); within each group, column sort applies. */
 function sortWorkTimeEntries(
   list: WorkTimeEntry[],
   customerNameById: Map<string, string>,
@@ -54,34 +90,13 @@ function sortWorkTimeEntries(
   sortDir: TimeLogSortDir,
 ): WorkTimeEntry[] {
   const dir = sortDir === 'asc' ? 1 : -1;
-  return [...list].sort((a, b) => {
-    let cmp = 0;
-    switch (sortKey) {
-      case 'when':
-        cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
-        break;
-      case 'duration': {
-        const da = new Date(a.endedAt).getTime() - new Date(a.startedAt).getTime();
-        const db = new Date(b.endedAt).getTime() - new Date(b.startedAt).getTime();
-        cmp = da - db;
-        break;
-      }
-      case 'client':
-        cmp = customerLabel(customerNameById, a.customerId).localeCompare(
-          customerLabel(customerNameById, b.customerId),
-          undefined,
-          { sensitivity: 'base' },
-        );
-        break;
-      case 'notes':
-        cmp = (a.notes || '').localeCompare(b.notes || '', undefined, { sensitivity: 'base' });
-        break;
-      case 'source':
-        cmp = a.source.localeCompare(b.source);
-        break;
-    }
-    return dir * cmp;
-  });
+  const cmp = (a: WorkTimeEntry, b: WorkTimeEntry) =>
+    compareLogRows(a, b, customerNameById, sortKey, dir);
+  const open = list.filter(e => !e.invoicedAt);
+  const billed = list.filter(e => !!e.invoicedAt);
+  open.sort(cmp);
+  billed.sort(cmp);
+  return [...open, ...billed];
 }
 
 function manualWindowFromTimes(
@@ -142,11 +157,16 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function invoicedLabel(iso: string | null): string {
+  if (!iso) return '';
+  return format(new Date(iso), 'yyyy-MM-dd HH:mm');
+}
+
 function exportTimeEntriesToCsv(
   rows: WorkTimeEntry[],
   customerNameById: Map<string, string>,
 ) {
-  const header = ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source'];
+  const header = ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source', 'Invoiced at'];
   const body = rows.map(e => {
     const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
     return [
@@ -156,6 +176,7 @@ function exportTimeEntriesToCsv(
       customerLabel(customerNameById, e.customerId),
       e.notes,
       e.source,
+      invoicedLabel(e.invoicedAt) || '—',
     ].map(csvEscape);
   });
   const csv = ['\uFEFF' + header.join(','), ...body.map(r => r.join(','))].join('\n');
@@ -179,6 +200,7 @@ function exportTimeEntriesToPdf(
       <td>${client}</td>
       <td>${escapeHtml(e.notes)}</td>
       <td>${escapeHtml(e.source)}</td>
+      <td>${escapeHtml(invoicedLabel(e.invoicedAt) || '—')}</td>
     </tr>`;
     })
     .join('');
@@ -207,7 +229,7 @@ function exportTimeEntriesToPdf(
   <table>
     <thead>
       <tr>
-        <th>Started</th><th>Ended</th><th>Duration</th><th>Client</th><th>Notes</th><th>Source</th>
+        <th>Started</th><th>Ended</th><th>Duration</th><th>Client</th><th>Notes</th><th>Source</th><th>Invoiced at</th>
       </tr>
     </thead>
     <tbody>${tableRows}</tbody>
@@ -252,7 +274,7 @@ type TimerDraft = { customer: string; notes: string };
 export function TimeTrackingPage() {
   const { profile } = useAuth();
   const { customers, loading: customersLoading } = useCustomers();
-  const { entries, loading: entriesLoading, error: entriesError, addEntry, removeEntry, reload } =
+  const { entries, loading: entriesLoading, error: entriesError, addEntry, removeEntry, reload, setEntryInvoiced } =
     useWorkTimeEntries();
   const timer = useActiveWorkTimer();
 
@@ -272,6 +294,7 @@ export function TimeTrackingPage() {
   const [manualError, setManualError] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [invoicedSavingId, setInvoicedSavingId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
 
@@ -407,6 +430,20 @@ export function TimeTrackingPage() {
       }
     },
     [removeEntry],
+  );
+
+  const handleInvoicedChange = useCallback(
+    async (id: string, invoiced: boolean) => {
+      setInvoicedSavingId(id);
+      try {
+        await setEntryInvoiced(id, invoiced);
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : 'Could not update invoice status.');
+      } finally {
+        setInvoicedSavingId(null);
+      }
+    },
+    [setEntryInvoiced],
   );
 
   if (!isStaffRole(profile?.role)) {
@@ -662,7 +699,10 @@ export function TimeTrackingPage() {
       </div>
 
       <Card>
-        <CardHeader title="Your log" subtitle="Click column headers to sort" />
+        <CardHeader
+          title="Your log"
+          subtitle="Not invoiced on top; invoiced lines are grayed at the bottom. Click headers to sort within each group."
+        />
         <CardBody className="p-0 sm:px-0">
           {loading ? (
             <div className="px-5 pb-5 space-y-2">
@@ -676,6 +716,7 @@ export function TimeTrackingPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
+                    <th className="px-3 py-3 w-[8.5rem] font-semibold">Invoiced</th>
                     <LogSortTh
                       column="when"
                       label="When"
@@ -727,6 +768,8 @@ export function TimeTrackingPage() {
                       clientName={customerLabel(customerNameById, row.customerId)}
                       onDelete={() => void handleDelete(row.id)}
                       deleting={deleteId === row.id}
+                      invoicedSaving={invoicedSavingId === row.id}
+                      onInvoicedChange={invoiced => void handleInvoicedChange(row.id, invoiced)}
                     />
                   ))}
                 </tbody>
@@ -779,17 +822,46 @@ function TimeRow({
   clientName,
   onDelete,
   deleting,
+  invoicedSaving,
+  onInvoicedChange,
 }: {
   row: WorkTimeEntry;
   clientName: string;
   onDelete: () => void;
   deleting: boolean;
+  invoicedSaving: boolean;
+  onInvoicedChange: (invoiced: boolean) => void;
 }) {
   const durationMs = new Date(row.endedAt).getTime() - new Date(row.startedAt).getTime();
   const when = `${format(new Date(row.startedAt), 'PPp')} – ${format(new Date(row.endedAt), 'p')}`;
+  const isInvoiced = !!row.invoicedAt;
   return (
-    <tr className="border-b border-border last:border-0 hover:bg-primary-50/50 dark:hover:bg-primary-900/20">
-      <td className="px-5 py-3 text-text-primary whitespace-nowrap">{when}</td>
+    <tr
+      className={cn(
+        'border-b border-border last:border-0',
+        isInvoiced
+          ? 'bg-primary-50/70 dark:bg-primary-900/25 text-text-muted opacity-80'
+          : 'hover:bg-primary-50/50 dark:hover:bg-primary-900/20 text-text-primary',
+      )}
+    >
+      <td className="px-3 py-3 align-top">
+        <div className="flex flex-col gap-1.5">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-border text-accent focus:ring-accent shrink-0"
+            checked={isInvoiced}
+            disabled={invoicedSaving}
+            onChange={e => onInvoicedChange(e.target.checked)}
+            aria-label={isInvoiced ? 'Invoiced — uncheck if not billed' : 'Mark as invoiced'}
+          />
+          {isInvoiced && row.invoicedAt && (
+            <span className="text-[10px] leading-tight text-text-muted max-w-[7.5rem]">
+              {format(new Date(row.invoicedAt), 'PPp')}
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="px-5 py-3 whitespace-nowrap">{when}</td>
       <td className="px-3 py-3 font-medium tabular-nums">{formatDurationMs(durationMs)}</td>
       <td className="px-3 py-3 text-text-secondary">{clientName}</td>
       <td className="px-3 py-3 text-text-secondary max-w-[200px] sm:max-w-xs truncate" title={row.notes}>

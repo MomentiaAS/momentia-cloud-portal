@@ -4,6 +4,7 @@ import {
   deleteWorkTimeEntry,
   fetchWorkTimeEntriesForUser,
   insertWorkTimeEntry,
+  updateWorkTimeEntry,
 } from '../lib/db';
 
 export function useWorkTimeEntries() {
@@ -52,5 +53,26 @@ export function useWorkTimeEntries() {
     setEntries(prev => prev.filter(e => e.id !== id));
   }, []);
 
-  return { entries, loading, error, reload: load, addEntry, removeEntry };
+  const setEntryInvoiced = useCallback(async (id: string, invoiced: boolean) => {
+    const invoicedAt = invoiced ? new Date().toISOString() : null;
+    let prevRow: WorkTimeEntry | undefined;
+    setEntries(prev => {
+      prevRow = prev.find(e => e.id === id);
+      return prev.map(e => (e.id === id ? { ...e, invoicedAt } : e));
+    });
+    try {
+      const updated = await updateWorkTimeEntry(id, { invoicedAt });
+      setEntries(prev => prev.map(e => (e.id === id ? updated : e)));
+    } catch {
+      const revert = prevRow;
+      if (revert) {
+        setEntries(prev => prev.map(e => (e.id === id ? revert : e)));
+      } else {
+        void load();
+      }
+      throw new Error('Could not update invoiced status.');
+    }
+  }, [load]);
+
+  return { entries, loading, error, reload: load, addEntry, removeEntry, setEntryInvoiced };
 }

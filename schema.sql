@@ -850,3 +850,8 @@ do $$ begin
       with check (auth.uid() = user_id);
   end if;
 end $$;
+
+-- ── v19 → v20: Work time entry invoicing (mark when billed to customer) ─────
+
+alter table public.work_time_entries
+  add column if not exists invoiced_at timestamptz;

@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown, Filter } from 'lucide-react';
+import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown, Filter, Pencil } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useWorkTimeEntries } from '../../hooks/useWorkTimeEntries';
@@ -9,9 +9,10 @@ import { useActiveWorkTimer, type TimerSlotIndex } from '../../hooks/useActiveWo
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { cn } from '../../components/ui/cn';
-import type { WorkTimeEntry } from '../../types';
+import type { WorkTimeEntry, WorkTimeSource, Customer } from '../../types';
 
 const inputClass = cn(
   'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary',
@@ -53,6 +54,18 @@ function localDateInputValue(d = new Date()): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Value for `<input type="datetime-local" />` in the browser's local zone. */
+function toDatetimeLocalValue(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${mo}-${day}T${h}:${mi}`;
 }
 
 function formatDurationMs(ms: number): string {
@@ -311,10 +324,170 @@ function exportTimeEntriesToPdf(
 
 type TimerDraft = { customer: string; notes: string };
 
+function EditTimeEntryModal({
+  entry,
+  customers,
+  onClose,
+  onSave,
+  onSaved,
+}: {
+  entry: WorkTimeEntry;
+  customers: Customer[];
+  onClose: () => void;
+  onSave: (payload: {
+    customerId: string | null;
+    startedAt: string;
+    endedAt: string;
+    notes: string;
+    source: WorkTimeSource;
+  }) => Promise<void>;
+  onSaved: () => void;
+}) {
+  const [startLocal, setStartLocal] = useState(() => toDatetimeLocalValue(entry.startedAt));
+  const [endLocal, setEndLocal] = useState(() => toDatetimeLocalValue(entry.endedAt));
+  const [customer, setCustomer] = useState(entry.customerId ?? '');
+  const [notes, setNotes] = useState(entry.notes);
+  const [source, setSource] = useState<WorkTimeSource>(entry.source);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setStartLocal(toDatetimeLocalValue(entry.startedAt));
+    setEndLocal(toDatetimeLocalValue(entry.endedAt));
+    setCustomer(entry.customerId ?? '');
+    setNotes(entry.notes);
+    setSource(entry.source);
+    setFormError(null);
+  }, [entry]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    const s = new Date(startLocal);
+    const en = new Date(endLocal);
+    if (!startLocal || !endLocal || Number.isNaN(s.getTime()) || Number.isNaN(en.getTime())) {
+      setFormError('Enter valid start and end date-times.');
+      return;
+    }
+    if (en.getTime() <= s.getTime()) {
+      setFormError('End must be after start.');
+      return;
+    }
+    try {
+      setSaving(true);
+      await onSave({
+        customerId: customer === '' ? null : customer,
+        startedAt: s.toISOString(),
+        endedAt: en.toISOString(),
+        notes,
+        source,
+      });
+      onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not save changes.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const customersSorted = [...customers].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  );
+
+  return (
+    <Modal
+      open
+      title="Edit time entry"
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" form="edit-time-entry-form" loading={saving}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <form id="edit-time-entry-form" onSubmit={e => void handleSubmit(e)} className="space-y-4">
+        {formError && (
+          <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+            <AlertCircle className="size-3.5 shrink-0" />
+            {formError}
+          </p>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="edit-start">
+            Start
+          </label>
+          <input
+            id="edit-start"
+            type="datetime-local"
+            className={inputClass}
+            value={startLocal}
+            onChange={e => setStartLocal(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="edit-end">
+            End
+          </label>
+          <input
+            id="edit-end"
+            type="datetime-local"
+            className={inputClass}
+            value={endLocal}
+            onChange={e => setEndLocal(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="edit-client">
+            Client
+          </label>
+          <select
+            id="edit-client"
+            className={inputClass}
+            value={customer}
+            onChange={e => setCustomer(e.target.value)}
+          >
+            <option value="">No client / internal</option>
+            {customersSorted.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1" htmlFor="edit-source">
+            Source
+          </label>
+          <select
+            id="edit-source"
+            className={inputClass}
+            value={source}
+            onChange={e => setSource(e.target.value as WorkTimeSource)}
+          >
+            <option value="timer">Timer</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+        <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
+      </form>
+    </Modal>
+  );
+}
+
 export function TimeTrackingPage() {
   const { profile } = useAuth();
   const { customers, loading: customersLoading } = useCustomers();
-  const { entries, loading: entriesLoading, error: entriesError, addEntry, removeEntry, reload, setEntryInvoiced } =
+  const { entries, loading: entriesLoading, error: entriesError, addEntry, removeEntry, reload, setEntryInvoiced, updateEntry } =
     useWorkTimeEntries();
   const timer = useActiveWorkTimer();
 
@@ -334,6 +507,7 @@ export function TimeTrackingPage() {
   const [manualError, setManualError] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<WorkTimeEntry | null>(null);
   const [invoicedSavingId, setInvoicedSavingId] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
@@ -893,7 +1067,7 @@ export function TimeTrackingPage() {
                           onSort={onLogSort}
                           className="px-3"
                         />
-                        <th className="px-5 py-3 w-12" />
+                        <th className="px-5 py-3 w-[5.5rem]" aria-label="Actions" />
                       </tr>
                     </thead>
                     <tbody>
@@ -902,6 +1076,7 @@ export function TimeTrackingPage() {
                           key={row.id}
                           row={row}
                           clientName={customerLabel(customerNameById, row.customerId)}
+                          onEdit={() => setEditingEntry(row)}
                           onDelete={() => void handleDelete(row.id)}
                           deleting={deleteId === row.id}
                           invoicedSaving={invoicedSavingId === row.id}
@@ -916,6 +1091,17 @@ export function TimeTrackingPage() {
           )}
         </CardBody>
       </Card>
+      {editingEntry && (
+        <EditTimeEntryModal
+          entry={editingEntry}
+          customers={customers}
+          onClose={() => setEditingEntry(null)}
+          onSave={async payload => {
+            await updateEntry(editingEntry.id, payload);
+          }}
+          onSaved={() => setEditingEntry(null)}
+        />
+      )}
     </div>
   );
 }
@@ -958,6 +1144,7 @@ function LogSortTh({
 function TimeRow({
   row,
   clientName,
+  onEdit,
   onDelete,
   deleting,
   invoicedSaving,
@@ -965,6 +1152,7 @@ function TimeRow({
 }: {
   row: WorkTimeEntry;
   clientName: string;
+  onEdit: () => void;
   onDelete: () => void;
   deleting: boolean;
   invoicedSaving: boolean;
@@ -1017,18 +1205,30 @@ function TimeRow({
           {row.source === 'timer' ? 'Timer' : 'Manual'}
         </span>
       </td>
-      <td className="px-5 py-3 text-right">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="text-text-muted hover:text-red-600"
-          aria-label="Delete entry"
-          onClick={onDelete}
-          loading={deleting}
-        >
-          <Trash2 className="size-4" />
-        </Button>
+      <td className="px-3 py-3 text-right">
+        <div className="inline-flex items-center justify-end gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-text-muted hover:text-accent"
+            aria-label="Edit entry"
+            onClick={onEdit}
+          >
+            <Pencil className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-text-muted hover:text-red-600"
+            aria-label="Delete entry"
+            onClick={onDelete}
+            loading={deleting}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
       </td>
     </tr>
   );

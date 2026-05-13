@@ -74,5 +74,26 @@ export function useWorkTimeEntries() {
     }
   }, [load]);
 
-  return { entries, loading, error, reload: load, addEntry, removeEntry, setEntryInvoiced };
+  const updateEntry = useCallback(
+    async (id: string, payload: {
+      customerId: string | null;
+      startedAt: string;
+      endedAt: string;
+      notes: string;
+      source: WorkTimeSource;
+    }) => {
+      const updated = await updateWorkTimeEntry(id, {
+        customerId: payload.customerId,
+        startedAt: payload.startedAt,
+        endedAt: payload.endedAt,
+        notes: payload.notes,
+        source: payload.source,
+      });
+      setEntries(prev => prev.map(e => (e.id === id ? updated : e)));
+      return updated;
+    },
+    [],
+  );
+
+  return { entries, loading, error, reload: load, addEntry, removeEntry, setEntryInvoiced, updateEntry };
 }

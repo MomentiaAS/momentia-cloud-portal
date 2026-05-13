@@ -776,6 +776,7 @@ export async function updateWorkTimeEntry(
     startedAt?: string;
     endedAt?: string;
     notes?: string;
+    source?: WorkTimeSource;
     /** Pass `null` to clear invoiced state, or an ISO string to set when invoiced. */
     invoicedAt?: string | null;
   },
@@ -788,6 +789,7 @@ export async function updateWorkTimeEntry(
   if (payload.startedAt != null) row.started_at = payload.startedAt;
   if (payload.endedAt != null) row.ended_at = payload.endedAt;
   if (payload.notes != null) row.notes = payload.notes.trim() || null;
+  if (payload.source != null) row.source = payload.source;
   if ('invoicedAt' in payload) row.invoiced_at = payload.invoicedAt;
 
   if (Object.keys(row).length === 0) throw new Error('No changes');

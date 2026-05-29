@@ -47,7 +47,7 @@ type DbBackupJob = {
 
 type DbAsset = {
   id: string; customer_id: string; name: string; type: string;
-  make: string | null; model: string | null; serial: string | null;
+  make: string | null; model: string | null; serial: string | null; site: string | null;
   os: string | null; status: string;
   ip_address: string | null; mac_address: string | null; location: string | null;
   purchase_date: string | null; warranty_end: string | null;
@@ -435,6 +435,7 @@ function toAsset(r: DbAsset): Asset {
     make:         r.make        ?? undefined,
     model:        r.model       ?? undefined,
     serial:       r.serial      ?? undefined,
+    site:         r.site        ?? undefined,
     os:           r.os          ?? undefined,
     ipAddress:    r.ip_address  ?? undefined,
     macAddress:   r.mac_address ?? undefined,
@@ -468,7 +469,7 @@ export async function fetchAllAssets(): Promise<Asset[]> {
 
 export interface AssetPayload {
   name: string; type: string; make?: string; model?: string;
-  serial?: string; os?: string;
+  serial?: string; site?: string; os?: string;
   ipAddress?: string; macAddress?: string; location?: string;
   status: string; purchaseDate?: string; warrantyEnd?: string; notes?: string;
 }
@@ -483,6 +484,7 @@ export async function insertAsset(customerId: string, p: AssetPayload): Promise<
       make:          p.make          || null,
       model:         p.model         || null,
       serial:        p.serial        || null,
+      site:          p.site          || null,
       os:            p.os            || null,
       ip_address:    p.ipAddress     || null,
       mac_address:   p.macAddress    || null,
@@ -507,6 +509,7 @@ export async function updateAsset(id: string, p: AssetPayload): Promise<Asset> {
       make:          p.make          || null,
       model:         p.model         || null,
       serial:        p.serial        || null,
+      site:          p.site          || null,
       os:            p.os            || null,
       ip_address:    p.ipAddress     || null,
       mac_address:   p.macAddress    || null,

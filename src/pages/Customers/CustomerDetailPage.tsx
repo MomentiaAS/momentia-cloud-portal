@@ -195,6 +195,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
       make: asset.make ?? '',
       model: asset.model ?? '',
       serial: '',
+      site: asset.site ?? '',
       os: asset.os ?? '',
       ipAddress: '',
       macAddress: '',
@@ -401,6 +402,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
                   ['Make', selected.make ?? '—'],
                   ['Model', selected.model ?? '—'],
                   ['Serial', selected.serial ?? '—'],
+                  ['Site', selected.site ?? '—'],
                   ['Operating system', selected.os ?? '—'],
                   ['IP address', selected.ipAddress ?? '—'],
                   ['MAC address', selected.macAddress ?? '—'],
@@ -460,7 +462,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 }
 
 const BULK_BLANK: AssetPayload = {
-  name: '', type: 'computer', make: '', model: '', serial: '',
+  name: '', type: 'computer', make: '', model: '', serial: '', site: '',
   os: '', ipAddress: '', macAddress: '', location: '',
   status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
@@ -567,6 +569,7 @@ function BulkAddAssetsModal({
                   <Input placeholder="Make" value={row.make} onChange={e => patchRow(idx, 'make', e.target.value)} />
                   <Input placeholder="Model" value={row.model} onChange={e => patchRow(idx, 'model', e.target.value)} />
                   <Input placeholder="Serial" value={row.serial} onChange={e => patchRow(idx, 'serial', e.target.value)} />
+                  <Input placeholder="Site" value={row.site} onChange={e => patchRow(idx, 'site', e.target.value)} />
                   <Input placeholder="IP address" value={row.ipAddress} onChange={e => patchRow(idx, 'ipAddress', e.target.value)} />
                   <Input placeholder="MAC address" value={row.macAddress} onChange={e => patchRow(idx, 'macAddress', e.target.value)} />
                   <Input placeholder="Location" value={row.location} onChange={e => patchRow(idx, 'location', e.target.value)} />

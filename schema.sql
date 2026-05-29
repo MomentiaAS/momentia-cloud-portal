@@ -855,3 +855,8 @@ end $$;
 
 alter table public.work_time_entries
   add column if not exists invoiced_at timestamptz;
+
+-- ── v20 → v21: Asset site (between serial and location in UI) ────────────────
+
+alter table public.assets
+  add column if not exists site text;

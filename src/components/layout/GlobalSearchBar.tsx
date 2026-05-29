@@ -121,6 +121,8 @@ export function GlobalSearchBar() {
         (a.make?.toLowerCase().includes(q)) ||
         (a.model?.toLowerCase().includes(q)) ||
         (a.serial?.toLowerCase().includes(q)) ||
+        (a.site?.toLowerCase().includes(q)) ||
+        (a.location?.toLowerCase().includes(q)) ||
         (a.ipAddress?.toLowerCase().includes(q)) ||
         (a.macAddress?.toLowerCase().includes(q)) ||
         (a.notes?.toLowerCase().includes(q)),

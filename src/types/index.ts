@@ -132,6 +132,7 @@ export interface Asset {
   make?:        string;
   model?:       string;
   serial?:      string;
+  site?:        string;
   os?:          string;
   ipAddress?:   string;
   macAddress?:  string;

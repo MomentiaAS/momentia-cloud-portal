@@ -38,7 +38,7 @@ const ASSET_STATUSES: { value: AssetStatus; label: string }[] = [
 ];
 
 const BLANK: AssetPayload = {
-  name: '', type: 'computer', make: '', model: '', serial: '',
+  name: '', type: 'computer', make: '', model: '', serial: '', site: '',
   os: '', ipAddress: '', macAddress: '', location: '',
   status: 'active', purchaseDate: '', warrantyEnd: '', notes: '',
 };
@@ -70,6 +70,7 @@ function toPayload(a: Asset): AssetPayload {
     make:         a.make         ?? '',
     model:        a.model        ?? '',
     serial:       a.serial       ?? '',
+    site:         a.site         ?? '',
     os:           a.os           ?? '',
     ipAddress:    a.ipAddress    ?? '',
     macAddress:   a.macAddress   ?? '',
@@ -186,6 +187,10 @@ export function AssetForm({ open, onClose, onSave, initial, seed }: AssetFormPro
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Serial Number</label>
                 <input className={inputClass} value={form.serial} onChange={e => set('serial', e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Site</label>
+                <input className={inputClass} value={form.site} onChange={e => set('site', e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">Operating System</label>

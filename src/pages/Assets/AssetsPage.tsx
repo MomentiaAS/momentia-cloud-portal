@@ -64,6 +64,7 @@ type SortKey =
   | 'make'
   | 'model'
   | 'serial'
+  | 'site'
   | 'location'
   | 'ipAddress'
   | 'macAddress'
@@ -88,6 +89,7 @@ function sortAssets(
       case 'make':       av = a.make        ?? '';              bv = b.make        ?? '';              break;
       case 'model':      av = a.model       ?? '';              bv = b.model       ?? '';              break;
       case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
+      case 'site':       av = a.site        ?? '';              bv = b.site        ?? '';              break;
       case 'location':   av = a.location    ?? '';              bv = b.location    ?? '';              break;
       case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
       case 'macAddress': av = a.macAddress  ?? '';              bv = b.macAddress  ?? '';              break;
@@ -121,6 +123,7 @@ function exportToPdf(
         <td>${a.make ?? '—'}</td>
         <td>${a.model ?? '—'}</td>
         <td class="mono">${a.serial ?? '—'}</td>
+        <td>${a.site ?? '—'}</td>
         <td>${a.location ?? '—'}</td>
         <td class="mono">${a.ipAddress ?? '—'}</td>
         <td class="mono">${a.macAddress ?? '—'}</td>
@@ -162,7 +165,7 @@ function exportToPdf(
     <thead>
       <tr>
         <th>Asset</th><th>Type</th><th>Customer</th><th>Make</th><th>Model</th><th>Serial</th>
-        <th>Location</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Purchase</th><th>Warranty</th>
+        <th>Site</th><th>Location</th><th>IP Address</th><th>MAC Address</th><th>Status</th><th>Purchase</th><th>Warranty</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -229,6 +232,7 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
     'Make',
     'Model',
     'Serial',
+    'Site',
     'Location',
     'IP Address',
     'MAC Address',
@@ -254,6 +258,7 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
       a.make ?? '—',
       a.model ?? '—',
       a.serial ?? '—',
+      a.site ?? '—',
       a.location ?? '—',
       a.ipAddress ?? '—',
       a.macAddress ?? '—',
@@ -361,6 +366,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
       <td className="px-4 py-3 text-xs text-text-muted">{asset.make ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
+      <td className="px-4 py-3 text-xs text-text-muted">{asset.site ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted">{asset.location ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.macAddress ?? '—'}</td>
@@ -447,6 +453,7 @@ const COLUMNS: { label: string; key: SortKey }[] = [
   { label: 'Make',        key: 'make'       },
   { label: 'Model',       key: 'model'      },
   { label: 'Serial',      key: 'serial'     },
+  { label: 'Site',        key: 'site'       },
   { label: 'Location',    key: 'location'   },
   { label: 'IP Address',  key: 'ipAddress'  },
   { label: 'MAC Address', key: 'macAddress' },
@@ -496,6 +503,7 @@ export function AssetsPage() {
       { key: 'make' },
       { key: 'model' },
       { key: 'serial' },
+      { key: 'site' },
       { key: 'location' },
       { key: 'ipAddress' },
       { key: 'macAddress' },
@@ -516,6 +524,7 @@ export function AssetsPage() {
       make: 140,
       model: 160,
       serial: 160,
+      site: 140,
       location: 160,
       ipAddress: 140,
       macAddress: 160,
@@ -579,6 +588,8 @@ export function AssetsPage() {
         (a.make?.toLowerCase().includes(q))      ||
         (a.model?.toLowerCase().includes(q))     ||
         (a.serial?.toLowerCase().includes(q))    ||
+        (a.site?.toLowerCase().includes(q))      ||
+        (a.location?.toLowerCase().includes(q))  ||
         (a.ipAddress?.toLowerCase().includes(q)) ||
         (a.macAddress?.toLowerCase().includes(q)) ||
         cName.includes(q)
@@ -775,6 +786,7 @@ export function AssetsPage() {
                     ['make','Make'],
                     ['model','Model'],
                     ['serial','Serial'],
+                    ['site','Site'],
                     ['location','Location'],
                     ['ipAddress','IP Address'],
                     ['macAddress','MAC Address'],
@@ -892,6 +904,7 @@ export function AssetsPage() {
                   ['Make', selectedAsset.make ?? '—'],
                   ['Model', selectedAsset.model ?? '—'],
                   ['Serial', selectedAsset.serial ?? '—'],
+                  ['Site', selectedAsset.site ?? '—'],
                   ['Operating system', selectedAsset.os ?? '—'],
                   ['IP address', selectedAsset.ipAddress ?? '—'],
                   ['MAC address', selectedAsset.macAddress ?? '—'],

@@ -204,38 +204,73 @@ function invoicedLabel(iso: string | null): string {
   return format(new Date(iso), 'yyyy-MM-dd');
 }
 
+function sanitizeExportFilenamePart(s: string): string {
+  return s.replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 48) || 'export';
+}
+
+function exportFilenameStem(
+  filterIds: string[],
+  customerNameById: Map<string, string>,
+): string {
+  const ids = filterIds.filter(x => x !== INTERNAL_CUSTOMER_FILTER_KEY);
+  const hasInternal = filterIds.includes(INTERNAL_CUSTOMER_FILTER_KEY);
+  if (ids.length === 1 && !hasInternal) {
+    const name = customerNameById.get(ids[0]) ?? 'client';
+    return `time_entries_${sanitizeExportFilenamePart(name)}`;
+  }
+  if (ids.length === 0 && hasInternal) return 'time_entries_internal';
+  return 'time_entries_selected';
+}
+
+type ExportTimeEntriesOpts = {
+  filenameStem: string;
+  /** Omit invoiced column (billing export of open lines only). */
+  billingOnly?: boolean;
+};
+
 function exportTimeEntriesToCsv(
   rows: WorkTimeEntry[],
   customerNameById: Map<string, string>,
+  opts: ExportTimeEntriesOpts,
 ) {
-  const header = ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source', 'Invoiced at'];
+  const header = opts.billingOnly
+    ? ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source']
+    : ['Started', 'Ended', 'Duration', 'Client', 'Notes', 'Source', 'Invoiced at'];
   const body = rows.map(e => {
     const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
-    return [
+    const cols = [
       format(new Date(e.startedAt), 'yyyy-MM-dd HH:mm'),
       format(new Date(e.endedAt), 'yyyy-MM-dd HH:mm'),
       formatDurationMs(dur),
       customerLabel(customerNameById, e.customerId),
       e.notes,
       e.source,
-      invoicedLabel(e.invoicedAt) || '—',
-    ].map(csvEscape);
+    ];
+    if (!opts.billingOnly) cols.push(invoicedLabel(e.invoicedAt) || '—');
+    return cols.map(csvEscape);
   });
   const csv = ['\uFEFF' + header.join(','), ...body.map(r => r.join(','))].join('\n');
   const totalMs = totalDurationMs(rows);
-  const totalLine = ['', '', formatDurationMs(totalMs), 'Total (this export)', '', '', '', ''].map(csvEscape).join(',');
-  downloadTextFile(`time_entries_${Date.now()}.csv`, `${csv}\n${totalLine}`, 'text/csv;charset=utf-8');
+  const totalPad = opts.billingOnly ? ['', ''] : ['', '', ''];
+  const totalLine = ['', '', formatDurationMs(totalMs), 'Total (this export)', ...totalPad]
+    .map(csvEscape)
+    .join(',');
+  downloadTextFile(`${opts.filenameStem}_${Date.now()}.csv`, `${csv}\n${totalLine}`, 'text/csv;charset=utf-8');
 }
 
 function exportTimeEntriesToPdf(
   rows: WorkTimeEntry[],
   customerNameById: Map<string, string>,
+  opts: ExportTimeEntriesOpts,
 ) {
   const now = new Date().toLocaleString();
   const tableRows = rows
     .map(e => {
       const dur = new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime();
       const client = escapeHtml(customerLabel(customerNameById, e.customerId));
+      const invoicedCell = opts.billingOnly
+        ? ''
+        : `<td>${escapeHtml(invoicedLabel(e.invoicedAt) || '—')}</td>`;
       return `
     <tr>
       <td>${escapeHtml(format(new Date(e.startedAt), 'yyyy-MM-dd HH:mm'))}</td>
@@ -244,17 +279,18 @@ function exportTimeEntriesToPdf(
       <td>${client}</td>
       <td>${escapeHtml(e.notes)}</td>
       <td>${escapeHtml(e.source)}</td>
-      <td>${escapeHtml(invoicedLabel(e.invoicedAt) || '—')}</td>
+      ${invoicedCell}
     </tr>`;
     })
     .join('');
 
   const totalMs = totalDurationMs(rows);
+  const totalColspan = opts.billingOnly ? 3 : 4;
   const totalRow = `
     <tr class="total">
       <td colspan="2"></td>
       <td>${escapeHtml(formatDurationMs(totalMs))}</td>
-      <td colspan="4">Total (this export)</td>
+      <td colspan="${totalColspan}">Total (this export)</td>
     </tr>`;
 
   const html = `<!DOCTYPE html>
@@ -278,11 +314,11 @@ function exportTimeEntriesToPdf(
 </head>
 <body>
   <h1>Time entries</h1>
-  <p class="meta">Exported ${escapeHtml(now)} · ${rows.length} entr${rows.length !== 1 ? 'ies' : 'y'}</p>
+  <p class="meta">Exported ${escapeHtml(now)} · ${opts.billingOnly ? 'Not yet invoiced · ' : ''}${rows.length} entr${rows.length !== 1 ? 'ies' : 'y'}</p>
   <table>
     <thead>
       <tr>
-        <th>Started</th><th>Ended</th><th>Duration</th><th>Client</th><th>Notes</th><th>Source</th><th>Invoiced at</th>
+        <th>Started</th><th>Ended</th><th>Duration</th><th>Client</th><th>Notes</th><th>Source</th>${opts.billingOnly ? '' : '<th>Invoiced at</th>'}
       </tr>
     </thead>
     <tbody>${tableRows}${totalRow}</tbody>
@@ -535,7 +571,31 @@ export function TimeTrackingPage() {
     [filteredLogEntries, customerNameById, logSortKey, logSortDir],
   );
 
+  const hasClientFilter = logCustomerFilterIds != null && logCustomerFilterIds.length > 0;
+
+  const exportLogEntries = useMemo(() => {
+    const open = filteredLogEntries.filter(e => !e.invoicedAt);
+    return sortWorkTimeEntries(open, customerNameById, logSortKey, logSortDir);
+  }, [filteredLogEntries, customerNameById, logSortKey, logSortDir]);
+
+  const exportLogOpts = useMemo((): ExportTimeEntriesOpts | null => {
+    if (!hasClientFilter || !logCustomerFilterIds) return null;
+    return {
+      filenameStem: exportFilenameStem(logCustomerFilterIds, customerNameById),
+      billingOnly: true,
+    };
+  }, [hasClientFilter, logCustomerFilterIds, customerNameById]);
+
+  const canExportLog = exportLogOpts != null && exportLogEntries.length > 0;
+
+  const exportDisabledReason = !hasClientFilter
+    ? 'Select one or more clients under Your log to export uninvoiced time.'
+    : exportLogEntries.length === 0
+      ? 'No uninvoiced entries for the selected client(s).'
+      : undefined;
+
   const logTotalMs = useMemo(() => totalDurationMs(sortedLogEntries), [sortedLogEntries]);
+  const logUninvoicedTotalMs = useMemo(() => totalDurationMs(exportLogEntries), [exportLogEntries]);
 
   const customersSorted = useMemo(
     () => [...customers].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
@@ -698,33 +758,45 @@ export function TimeTrackingPage() {
               variant="outline"
               size="sm"
               onClick={() => setExportOpen(v => !v)}
-              disabled={loading || sortedLogEntries.length === 0}
+              disabled={loading}
+              title={exportDisabledReason}
               rightIcon={<ChevronDown className="size-3.5" />}
             >
               Export
             </Button>
             {exportOpen && (
-              <div className="absolute right-0 mt-1 w-44 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
-                  onClick={() => {
-                    exportTimeEntriesToPdf(sortedLogEntries, customerNameById);
-                    setExportOpen(false);
-                  }}
-                >
-                  Export to PDF
-                </button>
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
-                  onClick={() => {
-                    exportTimeEntriesToCsv(sortedLogEntries, customerNameById);
-                    setExportOpen(false);
-                  }}
-                >
-                  Export to CSV
-                </button>
+              <div className="absolute right-0 mt-1 w-56 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
+                {exportDisabledReason ? (
+                  <p className="px-3 py-2 text-xs text-text-muted leading-snug">{exportDisabledReason}</p>
+                ) : (
+                  <>
+                    <p className="px-3 py-2 text-xs text-text-muted border-b border-border leading-snug">
+                      Uninvoiced lines for selected client(s) only ({exportLogEntries.length}).
+                    </p>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                      onClick={() => {
+                        if (!exportLogOpts) return;
+                        exportTimeEntriesToPdf(exportLogEntries, customerNameById, exportLogOpts);
+                        setExportOpen(false);
+                      }}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-1.5 text-sm text-text-secondary hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                      onClick={() => {
+                        if (!exportLogOpts) return;
+                        exportTimeEntriesToCsv(exportLogEntries, customerNameById, exportLogOpts);
+                        setExportOpen(false);
+                      }}
+                    >
+                      Export to CSV
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -931,7 +1003,7 @@ export function TimeTrackingPage() {
       <Card>
         <CardHeader
           title="Your log"
-          subtitle="Filter by client for totals and export. Not invoiced on top; invoiced lines grayed at the bottom. Sort headers apply within each group."
+          subtitle="Filter by client to export uninvoiced time (PDF/CSV). Not invoiced on top; invoiced lines grayed at the bottom. Sort headers apply within each group."
         />
         <CardBody className="p-0 sm:px-0">
           {loading ? (
@@ -1006,8 +1078,15 @@ export function TimeTrackingPage() {
                   <span className="font-medium text-text-primary tabular-nums">{formatDurationMs(logTotalMs)}</span>
                   {' · '}
                   {sortedLogEntries.length} entr{sortedLogEntries.length !== 1 ? 'ies' : 'y'}
-                  {logCustomerFilterIds != null && logCustomerFilterIds.length > 0 && (
-                    <span className="text-text-muted"> (filtered)</span>
+                  {hasClientFilter && (
+                    <>
+                      {' · '}
+                      <span className="font-medium text-text-primary tabular-nums">
+                        {formatDurationMs(logUninvoicedTotalMs)}
+                      </span>
+                      {' uninvoiced'}
+                      <span className="text-text-muted"> (filtered)</span>
+                    </>
                   )}
                 </p>
                 {logCustomerFilterIds != null && (

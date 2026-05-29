@@ -201,7 +201,7 @@ function escapeHtml(s: string): string {
 
 function invoicedLabel(iso: string | null): string {
   if (!iso) return '';
-  return format(new Date(iso), 'yyyy-MM-dd HH:mm');
+  return format(new Date(iso), 'yyyy-MM-dd');
 }
 
 function exportTimeEntriesToCsv(
@@ -1182,7 +1182,7 @@ function TimeRow({
           />
           {isInvoiced && row.invoicedAt && (
             <span className="text-[10px] leading-tight text-text-muted max-w-[7.5rem]">
-              {format(new Date(row.invoicedAt), 'PPp')}
+              {format(new Date(row.invoicedAt), 'PP')}
             </span>
           )}
         </div>

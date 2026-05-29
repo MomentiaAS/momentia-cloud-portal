@@ -766,8 +766,10 @@ export function TimeTrackingPage() {
             </Button>
             {exportOpen && (
               <div className="absolute right-0 mt-1 w-56 bg-surface-raised border border-border rounded-lg shadow-popover z-20 py-1">
-                {exportDisabledReason ? (
-                  <p className="px-3 py-2 text-xs text-text-muted leading-snug">{exportDisabledReason}</p>
+                {!canExportLog ? (
+                  <p className="px-3 py-2 text-xs text-text-muted leading-snug">
+                    {exportDisabledReason ?? 'Nothing to export.'}
+                  </p>
                 ) : (
                   <>
                     <p className="px-3 py-2 text-xs text-text-muted border-b border-border leading-snug">

@@ -73,33 +73,44 @@ type SortKey =
   | 'warrantyEnd';
 type SortDir = 'asc' | 'desc';
 
+const SITE_FILTER_NONE = '__none__';
+
+const TOOLBAR_SORT_KEYS: SortKey[] = ['customer', 'type', 'site', 'name'];
+
+function compareAssets(
+  a: Asset,
+  b: Asset,
+  customerMap: Record<string, string>,
+  key: SortKey,
+): number {
+  let av = '';
+  let bv = '';
+  switch (key) {
+    case 'name':       av = a.name;                           bv = b.name;                           break;
+    case 'type':       av = TYPE_META[a.type]?.label ?? '';   bv = TYPE_META[b.type]?.label ?? '';   break;
+    case 'customer':   av = customerMap[a.customerId] ?? '';  bv = customerMap[b.customerId] ?? '';  break;
+    case 'make':       av = a.make        ?? '';              bv = b.make        ?? '';              break;
+    case 'model':      av = a.model       ?? '';              bv = b.model       ?? '';              break;
+    case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
+    case 'site':       av = a.site        ?? '';              bv = b.site        ?? '';              break;
+    case 'location':   av = a.location    ?? '';              bv = b.location    ?? '';              break;
+    case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
+    case 'macAddress': av = a.macAddress  ?? '';              bv = b.macAddress  ?? '';              break;
+    case 'status':     av = a.status;                         bv = b.status;                         break;
+    case 'purchaseDate':av = a.purchaseDate ?? '';            bv = b.purchaseDate ?? '';            break;
+    case 'warrantyEnd':av = a.warrantyEnd ?? '';              bv = b.warrantyEnd ?? '';              break;
+  }
+  return av.localeCompare(bv, undefined, { sensitivity: 'base' });
+}
+
 function sortAssets(
   assets: Asset[],
   customerMap: Record<string, string>,
   key: SortKey,
   dir: SortDir,
 ): Asset[] {
-  return [...assets].sort((a, b) => {
-    let av = '';
-    let bv = '';
-    switch (key) {
-      case 'name':       av = a.name;                           bv = b.name;                           break;
-      case 'type':       av = TYPE_META[a.type]?.label ?? '';   bv = TYPE_META[b.type]?.label ?? '';   break;
-      case 'customer':   av = customerMap[a.customerId] ?? '';  bv = customerMap[b.customerId] ?? '';  break;
-      case 'make':       av = a.make        ?? '';              bv = b.make        ?? '';              break;
-      case 'model':      av = a.model       ?? '';              bv = b.model       ?? '';              break;
-      case 'serial':     av = a.serial      ?? '';              bv = b.serial      ?? '';              break;
-      case 'site':       av = a.site        ?? '';              bv = b.site        ?? '';              break;
-      case 'location':   av = a.location    ?? '';              bv = b.location    ?? '';              break;
-      case 'ipAddress':  av = a.ipAddress   ?? '';              bv = b.ipAddress   ?? '';              break;
-      case 'macAddress': av = a.macAddress  ?? '';              bv = b.macAddress  ?? '';              break;
-      case 'status':     av = a.status;                         bv = b.status;                         break;
-      case 'purchaseDate':av = a.purchaseDate ?? '';            bv = b.purchaseDate ?? '';            break;
-      case 'warrantyEnd':av = a.warrantyEnd ?? '';              bv = b.warrantyEnd ?? '';              break;
-    }
-    const cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
-    return dir === 'asc' ? cmp : -cmp;
-  });
+  const mul = dir === 'asc' ? 1 : -1;
+  return [...assets].sort((a, b) => mul * compareAssets(a, b, customerMap, key));
 }
 
 // ── PDF export ────────────────────────────────────────────────────────────────
@@ -470,6 +481,7 @@ export function AssetsPage() {
   const [query,        setQuery]        = useState('');
   const [customerFilter, setCustomerFilter] = useState<string>('All');
   const [typeFilter,   setTypeFilter]   = useState<string>('All');
+  const [siteFilter,   setSiteFilter]   = useState<string>('All');
   const [statusVisible, setStatusVisible] = useState<Record<Asset['status'], boolean>>({
     active: true,
     spare: true,
@@ -494,6 +506,22 @@ export function AssetsPage() {
     () => Object.fromEntries(customers.map(c => [c.id, c])),
     [customers],
   );
+
+  const siteFilterOptions = useMemo(() => {
+    const sites = new Set<string>();
+    let hasEmpty = false;
+    for (const a of assets) {
+      if (customerFilter !== 'All' && a.customerId !== customerFilter) continue;
+      if (typeFilter !== 'All' && a.type !== typeFilter) continue;
+      const s = (a.site ?? '').trim();
+      if (s) sites.add(s);
+      else hasEmpty = true;
+    }
+    return {
+      sites: [...sites].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+      hasEmpty,
+    };
+  }, [assets, customerFilter, typeFilter]);
 
   const assetsCols = useMemo(
     () => ([
@@ -581,6 +609,14 @@ export function AssetsPage() {
       if (typeFilter   !== 'All' && a.type   !== typeFilter)   return false;
       if (!statusVisible[a.status]) return false;
       if (customerFilter !== 'All' && a.customerId !== customerFilter) return false;
+      if (siteFilter !== 'All') {
+        const site = (a.site ?? '').trim();
+        if (siteFilter === SITE_FILTER_NONE) {
+          if (site) return false;
+        } else if (site !== siteFilter) {
+          return false;
+        }
+      }
       if (!q) return true;
       const cName = customerMap[a.customerId]?.toLowerCase() ?? '';
       return (
@@ -596,8 +632,23 @@ export function AssetsPage() {
       );
     });
     const sorted = sortAssets(base, customerMap, sortKey, sortDir);
-    return [...sorted].sort((a, b) => assetStatusOrder(a.status) - assetStatusOrder(b.status));
-  }, [assets, typeFilter, statusVisible, customerFilter, query, customerMap, sortKey, sortDir]);
+    const mul = sortDir === 'asc' ? 1 : -1;
+    return [...sorted].sort((a, b) => {
+      const byStatus = assetStatusOrder(a.status) - assetStatusOrder(b.status);
+      if (byStatus !== 0) return byStatus;
+      return mul * compareAssets(a, b, customerMap, sortKey);
+    });
+  }, [assets, typeFilter, statusVisible, customerFilter, siteFilter, query, customerMap, sortKey, sortDir]);
+
+  useEffect(() => {
+    if (siteFilter === 'All') return;
+    const { sites, hasEmpty } = siteFilterOptions;
+    const valid =
+      siteFilter === SITE_FILTER_NONE
+        ? hasEmpty
+        : sites.includes(siteFilter);
+    if (!valid) setSiteFilter('All');
+  }, [siteFilter, siteFilterOptions]);
 
   const expiringCount = assets.filter(a => {
     if (a.status !== 'active') return false;
@@ -720,6 +771,54 @@ export function AssetsPage() {
             <option key={t} value={t}>{TYPE_META[t as AssetType].label}</option>
           ))}
         </select>
+        <select
+          value={siteFilter}
+          onChange={e => setSiteFilter(e.target.value)}
+          className="h-9 w-44 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+        >
+          <option value="All">All sites</option>
+          {siteFilterOptions.hasEmpty && (
+            <option value={SITE_FILTER_NONE}>(No site)</option>
+          )}
+          {siteFilterOptions.sites.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <div className="flex items-center gap-1.5">
+          <label className="sr-only" htmlFor="assets-sort-by">Sort by</label>
+          <select
+            id="assets-sort-by"
+            value={sortKey}
+            onChange={e => {
+              setSortKey(e.target.value as SortKey);
+              setSortDir('asc');
+            }}
+            className="h-9 w-36 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+          >
+            <option value="customer">Sort: Customer</option>
+            <option value="type">Sort: Type</option>
+            <option value="site">Sort: Site</option>
+            <option value="name">Sort: Name</option>
+            {!TOOLBAR_SORT_KEYS.includes(sortKey) && (
+              <option value={sortKey}>
+                Sort: {COLUMNS.find(c => c.key === sortKey)?.label ?? sortKey}
+              </option>
+            )}
+          </select>
+          <button
+            type="button"
+            onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
+            className="h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-primary-100/50 dark:hover:bg-primary-700/30 transition-colors"
+            title={sortDir === 'asc' ? 'Ascending — click for descending' : 'Descending — click for ascending'}
+            aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+          >
+            {sortDir === 'asc' ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <ChevronDown className="size-4" />
+            )}
+          </button>
+        </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
           <button
             type="button"

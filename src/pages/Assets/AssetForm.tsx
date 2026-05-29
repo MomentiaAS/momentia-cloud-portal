@@ -6,7 +6,7 @@ import type { Asset, AssetType, AssetStatus } from '../../types';
 import type { AssetPayload } from '../../hooks/useAssets';
 
 const inputClass = cn(
-  'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary',
+  'h-11 md:h-9 w-full rounded-lg border border-border bg-surface px-3 text-base md:text-sm text-text-primary',
   'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
   'disabled:opacity-50 transition-colors',
 );
@@ -133,8 +133,8 @@ export function AssetForm({ open, onClose, onSave, initial, seed }: AssetFormPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-2xl bg-surface-raised border border-border rounded-card shadow-modal max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4">
+      <div className="w-full max-w-2xl bg-surface-raised border border-border rounded-t-2xl sm:rounded-card shadow-modal max-h-[min(92dvh,100%)] flex flex-col pb-[env(safe-area-inset-bottom,0px)]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">

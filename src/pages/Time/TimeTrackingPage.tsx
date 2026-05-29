@@ -1,7 +1,8 @@
 import { useMemo, useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown, Filter, Pencil } from 'lucide-react';
+import { AlertCircle, Trash2, ChevronDown, ChevronUp, ChevronsUpDown, Filter, Pencil, SlidersHorizontal } from 'lucide-react';
+import { Sheet } from '../../components/ui/Sheet';
 import { useAuth } from '../../context/AuthContext';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useWorkTimeEntries } from '../../hooks/useWorkTimeEntries';
@@ -15,7 +16,7 @@ import { cn } from '../../components/ui/cn';
 import type { WorkTimeEntry, WorkTimeSource, Customer } from '../../types';
 
 const inputClass = cn(
-  'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary',
+  'h-11 md:h-9 w-full rounded-lg border border-border bg-surface px-3 text-base md:text-sm text-text-primary',
   'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent',
   'disabled:opacity-50 transition-colors',
 );
@@ -548,6 +549,7 @@ export function TimeTrackingPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
   const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
+  const [logFiltersOpen, setLogFiltersOpen] = useState(false);
   const customerFilterRef = useRef<HTMLDivElement | null>(null);
 
   const [logCustomerFilterIds, setLogCustomerFilterIds] = useState<string[] | null>(null);
@@ -1017,8 +1019,20 @@ export function TimeTrackingPage() {
             <p className="px-5 pb-5 text-sm text-text-muted">No entries yet. Use the timers or manual form above.</p>
           ) : (
             <>
-              <div className="px-5 py-3 border-b border-border flex flex-wrap items-center gap-3">
-                <div ref={customerFilterRef} className="relative">
+              <div className="px-4 sm:px-5 py-3 border-b border-border flex flex-wrap items-center gap-2 sm:gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="md:hidden"
+                  leftIcon={<SlidersHorizontal className="size-3.5" />}
+                  onClick={() => setLogFiltersOpen(true)}
+                >
+                  Clients
+                  {logCustomerFilterIds != null && logCustomerFilterIds.length > 0
+                    ? ` (${logCustomerFilterIds.length})`
+                    : ''}
+                </Button>
+                <div ref={customerFilterRef} className="relative hidden md:block">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1097,13 +1111,73 @@ export function TimeTrackingPage() {
                   </Button>
                 )}
               </div>
+
+              <Sheet open={logFiltersOpen} onClose={() => setLogFiltersOpen(false)} title="Filter by client">
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2.5 text-sm rounded-lg border border-border hover:bg-primary-100 dark:hover:bg-primary-700/40"
+                    onClick={() => { setLogCustomerFilterIds(null); setLogFiltersOpen(false); }}
+                  >
+                    Show all clients
+                  </button>
+                  <label className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border border-border cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="size-5 rounded border-border text-accent shrink-0"
+                      checked={logCustomerFilterIds?.includes(INTERNAL_CUSTOMER_FILTER_KEY) ?? false}
+                      onChange={() =>
+                        setLogCustomerFilterIds(prev =>
+                          toggleCustomerFilterId(prev, INTERNAL_CUSTOMER_FILTER_KEY),
+                        )
+                      }
+                    />
+                    Internal (no client)
+                  </label>
+                  {customersSorted.map(c => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border border-border cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-5 rounded border-border text-accent shrink-0"
+                        checked={logCustomerFilterIds?.includes(c.id) ?? false}
+                        onChange={() =>
+                          setLogCustomerFilterIds(prev => toggleCustomerFilterId(prev, c.id))
+                        }
+                      />
+                      <span className="truncate">{c.name}</span>
+                    </label>
+                  ))}
+                  <Button variant="primary" className="w-full" onClick={() => setLogFiltersOpen(false)}>
+                    Done
+                  </Button>
+                </div>
+              </Sheet>
+
               {sortedLogEntries.length === 0 ? (
                 <p className="px-5 py-8 text-sm text-text-muted text-center">
                   No entries match the current client selection. Change the checkboxes under Clients or choose
                   &quot;Show all clients&quot;.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                <div className="md:hidden">
+                  {sortedLogEntries.map(row => (
+                    <TimeMobileCard
+                      key={row.id}
+                      row={row}
+                      clientName={customerLabel(customerNameById, row.customerId)}
+                      onEdit={() => setEditingEntry(row)}
+                      onDelete={() => void handleDelete(row.id)}
+                      deleting={deleteId === row.id}
+                      invoicedSaving={invoicedSavingId === row.id}
+                      onInvoicedChange={invoiced => void handleInvoicedChange(row.id, invoiced)}
+                    />
+                  ))}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
@@ -1167,6 +1241,7 @@ export function TimeTrackingPage() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </>
           )}
@@ -1219,6 +1294,81 @@ function LogSortTh({
           : <ChevronsUpDown className="size-3 shrink-0 opacity-60" />}
       </button>
     </th>
+  );
+}
+
+function formatWhenMobile(startedAt: string, endedAt: string): string {
+  const s = new Date(startedAt);
+  const e = new Date(endedAt);
+  const sameDay = s.toDateString() === e.toDateString();
+  if (sameDay) {
+    return `${format(s, 'd MMM')} · ${format(s, 'p')} – ${format(e, 'p')}`;
+  }
+  return `${format(s, 'd MMM p')} – ${format(e, 'd MMM p')}`;
+}
+
+function TimeMobileCard({
+  row,
+  clientName,
+  onEdit,
+  onDelete,
+  deleting,
+  invoicedSaving,
+  onInvoicedChange,
+}: {
+  row: WorkTimeEntry;
+  clientName: string;
+  onEdit: () => void;
+  onDelete: () => void;
+  deleting: boolean;
+  invoicedSaving: boolean;
+  onInvoicedChange: (invoiced: boolean) => void;
+}) {
+  const durationMs = new Date(row.endedAt).getTime() - new Date(row.startedAt).getTime();
+  const isInvoiced = !!row.invoicedAt;
+  return (
+    <div
+      className={cn(
+        'px-4 py-3.5 border-b border-border',
+        isInvoiced && 'bg-primary-50/70 dark:bg-primary-900/25 opacity-90',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          className="size-5 mt-0.5 rounded border-border text-accent shrink-0"
+          checked={isInvoiced}
+          disabled={invoicedSaving}
+          onChange={e => onInvoicedChange(e.target.checked)}
+          aria-label={isInvoiced ? 'Invoiced' : 'Mark as invoiced'}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold tabular-nums text-text-primary">{formatDurationMs(durationMs)}</p>
+            <span className={cn(
+              'text-[10px] font-medium uppercase px-1.5 py-0.5 rounded',
+              row.source === 'timer' ? 'bg-accent/15 text-accent' : 'bg-primary-200/60 dark:bg-primary-700/50 text-text-secondary',
+            )}>
+              {row.source === 'timer' ? 'Timer' : 'Manual'}
+            </span>
+          </div>
+          <p className="text-sm text-text-secondary mt-0.5">{clientName}</p>
+          <p className="text-xs text-text-muted mt-1">{formatWhenMobile(row.startedAt, row.endedAt)}</p>
+          {row.notes && <p className="text-xs text-text-secondary mt-1 line-clamp-2">{row.notes}</p>}
+          {isInvoiced && row.invoicedAt && (
+            <p className="text-[10px] text-text-muted mt-1">Invoiced {format(new Date(row.invoicedAt), 'PP')}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex justify-end gap-1 mt-2">
+        <Button type="button" variant="ghost" size="icon" onClick={onEdit} aria-label="Edit entry">
+          <Pencil className="size-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" onClick={onDelete} loading={deleting} aria-label="Delete entry">
+          <Trash2 className="size-4 text-red-500" />
+        </Button>
+      </div>
+    </div>
   );
 }
 

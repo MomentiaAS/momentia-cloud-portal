@@ -68,7 +68,13 @@ function Highlight({ text, query }: { text: string; query: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function GlobalSearchBar() {
+interface GlobalSearchBarProps {
+  /** Full-width overlay mode (mobile top bar). */
+  mobileOverlay?: boolean;
+  onClose?: () => void;
+}
+
+export function GlobalSearchBar({ mobileOverlay, onClose }: GlobalSearchBarProps = {}) {
   const navigate = useNavigate();
   const { customers } = useCustomers();
   const { assets }    = useAllAssets();
@@ -80,6 +86,14 @@ export function GlobalSearchBar() {
 
   const inputRef    = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mobileOverlay) {
+      setOpen(true);
+      const t = window.setTimeout(() => inputRef.current?.focus(), 50);
+      return () => window.clearTimeout(t);
+    }
+  }, [mobileOverlay]);
 
   // customer name lookup for asset/alert subtitles
   const customerMap = useMemo(
@@ -184,10 +198,16 @@ export function GlobalSearchBar() {
     setQuery('');
     setOpen(false);
     setActiveIdx(-1);
+    onClose?.();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Escape') { setOpen(false); setActiveIdx(-1); return; }
+    if (e.key === 'Escape') {
+      setOpen(false);
+      setActiveIdx(-1);
+      onClose?.();
+      return;
+    }
     if (!open || results.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -228,7 +248,7 @@ export function GlobalSearchBar() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative flex-1 max-w-sm">
+    <div className={cn('relative', mobileOverlay ? 'w-full' : 'flex-1 max-w-sm')}>
       {/* Input */}
       <div className="relative flex items-center">
         <span className="absolute left-3 text-text-muted pointer-events-none">
@@ -241,7 +261,7 @@ export function GlobalSearchBar() {
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search customers, assets, alerts…"
+          placeholder={mobileOverlay ? 'Search…' : 'Search customers, assets, alerts…'}
           aria-label="Global search"
           aria-haspopup="listbox"
           aria-expanded={showDropdown}
@@ -249,7 +269,7 @@ export function GlobalSearchBar() {
             'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-sm',
             'placeholder:text-text-muted transition-colors duration-150',
             'focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent',
-            'h-9 pl-9',
+            'h-11 md:h-9 pl-9',
             query ? 'pr-9' : 'pr-3',
           )}
         />
@@ -277,9 +297,11 @@ export function GlobalSearchBar() {
           ref={dropdownRef}
           role="listbox"
           className={cn(
-            'absolute left-0 right-0 top-full mt-1 z-50',
+            mobileOverlay
+              ? 'relative mt-2 border-0 shadow-none max-h-[calc(100dvh-5rem)]'
+              : 'absolute left-0 right-0 top-full mt-1 z-50 max-h-[70vh]',
             'bg-surface-raised border border-border rounded-xl shadow-modal',
-            'overflow-hidden max-h-[70vh] overflow-y-auto',
+            'overflow-hidden overflow-y-auto',
           )}
         >
           {results.length === 0 ? (
@@ -336,12 +358,14 @@ export function GlobalSearchBar() {
             ))
           )}
 
-          {/* Footer hint */}
-          <p className="px-4 py-1.5 text-[10px] text-text-muted bg-surface/60 border-t border-border flex items-center gap-3">
-            <span><kbd className="font-sans bg-border px-1 rounded text-[10px]">↑↓</kbd> navigate</span>
-            <span><kbd className="font-sans bg-border px-1 rounded text-[10px]">↵</kbd> open</span>
-            <span><kbd className="font-sans bg-border px-1 rounded text-[10px]">esc</kbd> close</span>
-          </p>
+          {/* Footer hint — desktop only */}
+          {!mobileOverlay && (
+            <p className="hidden md:flex px-4 py-1.5 text-[10px] text-text-muted bg-surface/60 border-t border-border items-center gap-3">
+              <span><kbd className="font-sans bg-border px-1 rounded text-[10px]">↑↓</kbd> navigate</span>
+              <span><kbd className="font-sans bg-border px-1 rounded text-[10px]">↵</kbd> open</span>
+              <span><kbd className="font-sans bg-border px-1 rounded text-[10px]">esc</kbd> close</span>
+            </p>
+          )}
         </div>
       )}
     </div>

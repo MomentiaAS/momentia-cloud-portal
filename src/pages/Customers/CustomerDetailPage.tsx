@@ -369,7 +369,7 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 
       {/* Delete confirm */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4">
           <div className="w-full max-w-sm bg-surface-raised border border-border rounded-card shadow-modal p-6 space-y-4">
             <p className="text-sm font-semibold text-text-primary">Remove this asset?</p>
             <p className="text-xs text-text-muted">This cannot be undone.</p>
@@ -385,9 +385,9 @@ function AssetsTab({ customerId, canEdit }: { customerId: string; canEdit: boole
 
       {/* Asset detail drawer */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4">
           <div className="absolute inset-0" onClick={() => setSelected(null)} />
-          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
+          <aside className="relative z-10 w-full max-w-2xl max-h-[min(92dvh,100%)] bg-surface-raised border border-border rounded-t-2xl sm:rounded-card flex flex-col shadow-modal pb-[env(safe-area-inset-bottom,0px)]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selected.name}</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelected(null)} aria-label="Close">
@@ -521,8 +521,8 @@ function BulkAddAssetsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-6xl bg-surface-raised border border-border rounded-card shadow-modal max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-4">
+      <div className="w-full max-w-6xl bg-surface-raised border border-border rounded-t-2xl sm:rounded-card shadow-modal max-h-[min(92dvh,100%)] flex flex-col pb-[env(safe-area-inset-bottom,0px)]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h3 className="text-base font-semibold text-text-primary">Bulk Add Assets</h3>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
@@ -723,9 +723,9 @@ function BackupTab({ jobs }: { jobs: BackupJob[] }) {
 
       {/* Job detail drawer */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4">
           <div className="absolute inset-0" onClick={() => setSelected(null)} />
-          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
+          <aside className="relative z-10 w-full max-w-2xl max-h-[min(92dvh,100%)] bg-surface-raised border border-border rounded-t-2xl sm:rounded-card flex flex-col shadow-modal pb-[env(safe-area-inset-bottom,0px)]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selected.jobName}</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelected(null)} aria-label="Close">
@@ -1077,9 +1077,9 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
 
       {/* Devices drawer */}
       {devicesOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4">
           <div className="absolute inset-0" onClick={() => setDevicesOpen(false)} />
-          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
+          <aside className="relative z-10 w-full max-w-2xl max-h-[min(92dvh,100%)] bg-surface-raised border border-border rounded-t-2xl sm:rounded-card flex flex-col shadow-modal pb-[env(safe-area-inset-bottom,0px)]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary">
                 Devices ({devices.length})
@@ -1135,9 +1135,9 @@ function NetworkTab({ siteId, customerId, customerName, onHealthChange }: {
 
       {/* Clients drawer */}
       {clientsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4">
           <div className="absolute inset-0" onClick={() => setClientsOpen(false)} />
-          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
+          <aside className="relative z-10 w-full max-w-2xl max-h-[min(92dvh,100%)] bg-surface-raised border border-border rounded-t-2xl sm:rounded-card flex flex-col shadow-modal pb-[env(safe-area-inset-bottom,0px)]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary">
                 Clients ({clients.length})
@@ -1396,13 +1396,13 @@ export function CustomerDetailPage() {
       {/* Full-width tabbed content */}
       <Card>
         {/* Tab bar */}
-        <div className="flex border-b border-border px-4 gap-1 pt-2 flex-wrap">
+        <div className="flex border-b border-border px-2 sm:px-4 gap-1 pt-2 overflow-x-auto overscroll-x-contain scrollbar-none flex-nowrap">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors -mb-px',
+                'flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-t-lg transition-colors -mb-px shrink-0 min-h-[44px]',
                 activeTab === tab.id
                   ? 'text-accent border-b-2 border-accent'
                   : 'text-text-muted hover:text-text-primary',

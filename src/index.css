@@ -41,6 +41,40 @@
     min-height: 100dvh;
   }
 
+  /* Prevent iOS zoom on focus (inputs use text-base below md in components) */
+  @supports (-webkit-touch-callout: none) {
+    select,
+    textarea,
+    input[type='text'],
+    input[type='email'],
+    input[type='password'],
+    input[type='search'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='number'],
+    input[type='date'],
+    input[type='datetime-local'],
+    input[type='time'] {
+      font-size: 16px;
+    }
+    @media (min-width: 768px) {
+      select,
+      textarea,
+      input[type='text'],
+      input[type='email'],
+      input[type='password'],
+      input[type='search'],
+      input[type='tel'],
+      input[type='url'],
+      input[type='number'],
+      input[type='date'],
+      input[type='datetime-local'],
+      input[type='time'] {
+        font-size: 0.875rem;
+      }
+    }
+  }
+
   /* Prevent browser autofill from forcing white backgrounds */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
@@ -79,5 +113,13 @@
   /* Nav pill active */
   .nav-pill-active {
     @apply bg-accent/10 dark:bg-accent/15 text-accent font-medium;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }

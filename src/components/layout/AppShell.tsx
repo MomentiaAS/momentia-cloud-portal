@@ -49,8 +49,8 @@ export function AppShell({ children }: AppShellProps) {
           id="main-content"
           tabIndex={-1}
           className={cn(
-            'flex-1 overflow-y-auto',
-            'px-4 sm:px-6 lg:px-8 py-6',
+            'flex-1 overflow-y-auto overscroll-y-contain',
+            'px-4 sm:px-6 lg:px-8 py-4 sm:py-6',
           )}
         >
           {children}

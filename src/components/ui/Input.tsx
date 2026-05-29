@@ -32,11 +32,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-sm',
+              'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-base md:text-sm',
               'placeholder:text-text-muted transition-colors duration-150',
               'focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent',
               'disabled:opacity-50 disabled:pointer-events-none',
-              'h-9 px-3',
+              'h-11 md:h-9 px-3',
               leftIcon  && 'pl-9',
               (rightIcon || showClear) && (rightIcon && showClear ? 'pr-14' : 'pr-9'),
               error && 'border-red-500 focus:ring-red-500',
@@ -93,9 +93,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-sm',
+            'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-base md:text-sm',
             'focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent',
-            'disabled:opacity-50 h-9 px-3',
+            'disabled:opacity-50 h-11 md:h-9 px-3',
             error && 'border-red-500',
             className,
           )}
@@ -129,7 +129,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={taId}
           className={cn(
-            'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-sm',
+            'w-full rounded-lg border border-border bg-surface-raised text-text-primary text-base md:text-sm',
             'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent',
             'min-h-[80px] px-3 py-2 resize-y',
             error && 'border-red-500',

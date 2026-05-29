@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Bell, Menu, RefreshCw, CalendarDays, ChevronDown, LogOut, UserCircle } from 'lucide-react';
+import { Sun, Moon, Bell, Menu, RefreshCw, CalendarDays, ChevronDown, LogOut, UserCircle, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../ui/cn';
 import { Avatar } from '../ui/Avatar';
@@ -38,6 +38,7 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
   const [dateRange, setDateRange]       = useState('Last 7 days');
   const [showDateDrop, setShowDateDrop] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [refreshSpin, setRefreshSpin]   = useState(false);
 
   const dateRef = useRef<HTMLDivElement>(null);
@@ -86,9 +87,9 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
   return (
     <header
       className={cn(
-        'h-[var(--topbar-height)] shrink-0',
+        'min-h-[var(--topbar-height)] shrink-0 pt-[env(safe-area-inset-top,0px)]',
         'bg-surface-raised border-b border-border',
-        'flex items-center gap-3 px-4',
+        'flex items-center gap-2 sm:gap-3 px-3 sm:px-4',
       )}
     >
       {/* Hamburger — visible on small screens */}
@@ -102,10 +103,21 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
         <Menu className="size-4" />
       </Button>
 
-      {/* Global search */}
-      <GlobalSearchBar />
+      {/* Global search — inline on md+, icon opens full-screen sheet on mobile */}
+      <div className="hidden md:block flex-1 max-w-md min-w-0">
+        <GlobalSearchBar />
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden shrink-0"
+        onClick={() => setMobileSearchOpen(true)}
+        aria-label="Open search"
+      >
+        <Search className="size-5" />
+      </Button>
 
-      <div className="flex-1" />
+      <div className="flex-1 md:flex-none" />
 
       {/* Dashboard extras */}
       {showDashboardExtras && (
@@ -213,6 +225,19 @@ export function TopBar({ showDashboardExtras = false }: { showDashboardExtras?: 
           </div>
         )}
       </div>
+
+      {mobileSearchOpen && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-surface md:hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))]">
+            <div className="flex-1 min-w-0">
+              <GlobalSearchBar mobileOverlay onClose={() => setMobileSearchOpen(false)} />
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setMobileSearchOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

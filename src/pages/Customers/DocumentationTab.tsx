@@ -235,9 +235,29 @@ export function DocumentationTab({ customerId, canEdit }: { customerId: string; 
   const showEditor = canEdit && mode === 'edit';
 
   return (
-    <div className="flex min-h-[320px] max-h-[min(70vh,720px)] border-t border-border">
-      {/* Left nav */}
-      <aside className="w-52 md:w-56 shrink-0 border-r border-border flex flex-col bg-surface/50">
+    <div className="flex flex-col md:flex-row min-h-[320px] max-h-[min(85dvh,720px)] border-t border-border">
+      {/* Section picker — dropdown on mobile, sidebar on md+ */}
+      <div className="md:hidden shrink-0 p-3 border-b border-border bg-surface/50">
+        <label className="sr-only" htmlFor="doc-section-select">Documentation section</label>
+        <select
+          id="doc-section-select"
+          value={selectedId ?? ''}
+          onChange={e => {
+            const id = e.target.value;
+            if (id) trySelect(id);
+          }}
+          className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-base text-text-primary"
+        >
+          {sections.length === 0 ? (
+            <option value="">No sections</option>
+          ) : (
+            sections.map(s => (
+              <option key={s.id} value={s.id}>{s.title}</option>
+            ))
+          )}
+        </select>
+      </div>
+      <aside className="hidden md:flex w-52 lg:w-56 shrink-0 border-r border-border flex-col bg-surface/50">
         <div className="p-2 border-b border-border flex items-center justify-between gap-1">
           <span className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1">Sections</span>
           {canEdit && (

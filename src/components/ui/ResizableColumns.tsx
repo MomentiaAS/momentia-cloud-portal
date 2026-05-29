@@ -73,12 +73,15 @@ export function ResizableTh({
   onResize,
   className,
   children,
+  resizable = true,
 }: {
   colKey: string;
   widths: ColumnWidthMap;
   onResize: (key: string, nextWidth: number) => void;
   className?: string;
   children: React.ReactNode;
+  /** False on touch / narrow viewports (no drag handle). */
+  resizable?: boolean;
 }) {
   const startXRef = useRef(0);
   const startWRef = useRef(0);
@@ -119,16 +122,18 @@ export function ResizableTh({
       style={widthStyle}
     >
       {children}
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        onMouseDown={onMouseDown}
-        className={cn(
-          'absolute top-0 right-0 h-full w-2 cursor-col-resize',
-          'hover:bg-accent/15',
-        )}
-        title="Drag to resize"
-      />
+      {resizable && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          onMouseDown={onMouseDown}
+          className={cn(
+            'absolute top-0 right-0 h-full w-2 cursor-col-resize hidden lg:block',
+            'hover:bg-accent/15',
+          )}
+          title="Drag to resize"
+        />
+      )}
     </th>
   );
 }

@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, RefreshCw, AlertCircle,
   Laptop, Server, Network, Smartphone, Printer, Package, Shield, Wifi, HardDrive, Monitor, Home, Wrench, Cctv, Cpu, Lock, ShieldCheck,
-  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2, X,
+  ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2, X, SlidersHorizontal,
 } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Sheet } from '../../components/ui/Sheet';
 import { cn } from '../../components/ui/cn';
 import { ResizableColGroup, ResizableTh, useResizableColumns } from '../../components/ui/ResizableColumns';
 import { useAllAssets } from '../../hooks/useAssets';
@@ -294,6 +295,9 @@ function exportToCsv(assets: Asset[], customerMap: Record<string, string>, scope
   // window.alert('CSV export started');
 }
 
+const selectClass =
+  'h-11 md:h-9 w-full rounded-lg border border-border bg-surface px-3 text-base md:text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40';
+
 function ResizableSortTh({
   colKey,
   label,
@@ -303,6 +307,7 @@ function ResizableSortTh({
   onSort,
   widths,
   onResize,
+  thClassName,
 }: {
   colKey: SortKey;
   label: string;
@@ -312,10 +317,11 @@ function ResizableSortTh({
   onSort: (k: SortKey) => void;
   widths: Record<string, number>;
   onResize: (key: string, nextWidth: number) => void;
+  thClassName?: string;
 }) {
   const Icon = active ? (dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
   return (
-    <ResizableTh colKey={colKey} widths={widths} onResize={onResize}>
+    <ResizableTh colKey={colKey} widths={widths} onResize={onResize} className={thClassName}>
       <button
         onClick={() => onSort(sortKey)}
         className={cn(
@@ -329,6 +335,18 @@ function ResizableSortTh({
     </ResizableTh>
   );
 }
+
+const ASSET_TH_CLASS: Partial<Record<SortKey | 'actions', string>> = {
+  make: 'hidden lg:table-cell',
+  model: 'hidden lg:table-cell',
+  serial: 'hidden xl:table-cell',
+  site: 'hidden md:table-cell',
+  location: 'hidden xl:table-cell',
+  ipAddress: 'hidden xl:table-cell',
+  macAddress: 'hidden xl:table-cell',
+  purchaseDate: 'hidden xl:table-cell',
+  warrantyEnd: 'hidden lg:table-cell',
+};
 
 // ── Asset row ─────────────────────────────────────────────────────────────────
 
@@ -361,7 +379,7 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 text-xs text-text-secondary">{typeLabel}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-secondary', ASSET_TH_CLASS.type)}>{typeLabel}</td>
       <td className="px-4 py-3">
         <button
           onClick={(e) => {
@@ -374,13 +392,13 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
           <ExternalLink className="size-3" />
         </button>
       </td>
-      <td className="px-4 py-3 text-xs text-text-muted">{asset.make ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted">{asset.model ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.serial ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted">{asset.site ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted">{asset.location ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.ipAddress ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-text-muted font-mono">{asset.macAddress ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted', ASSET_TH_CLASS.make)}>{asset.make ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted', ASSET_TH_CLASS.model)}>{asset.model ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted font-mono', ASSET_TH_CLASS.serial)}>{asset.serial ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted', ASSET_TH_CLASS.site)}>{asset.site ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted', ASSET_TH_CLASS.location)}>{asset.location ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted font-mono', ASSET_TH_CLASS.ipAddress)}>{asset.ipAddress ?? '—'}</td>
+      <td className={cn('px-4 py-3 text-xs text-text-muted font-mono', ASSET_TH_CLASS.macAddress)}>{asset.macAddress ?? '—'}</td>
       <td className="px-4 py-3">
         <span className={cn(
           'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
@@ -389,8 +407,8 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
                                        'bg-surface text-text-muted border border-border',
         )}>{asset.status}</span>
       </td>
-      <td className="px-4 py-3 text-xs text-text-muted font-mono">{formatDateNo(asset.purchaseDate)}</td>
-      <td className="px-4 py-3">
+      <td className={cn('px-4 py-3 text-xs text-text-muted font-mono', ASSET_TH_CLASS.purchaseDate)}>{formatDateNo(asset.purchaseDate)}</td>
+      <td className={cn('px-4 py-3', ASSET_TH_CLASS.warrantyEnd)}>
         {ws === null ? <span className="text-xs text-text-muted">—</span> : (
           <span className={cn(
             'text-xs',
@@ -431,6 +449,79 @@ function AssetRow({ asset, customerName, onViewCustomer, onEdit, onDelete, onOpe
         </div>
       </td>
     </tr>
+  );
+}
+
+function AssetMobileCard({
+  asset,
+  customerName,
+  onOpenDetails,
+  onEdit,
+  onDelete,
+}: {
+  asset: Asset;
+  customerName: string;
+  onOpenDetails: (a: Asset) => void;
+  onEdit: (a: Asset) => void;
+  onDelete: (a: Asset) => void;
+}) {
+  const { icon: Icon, label: typeLabel } = TYPE_META[asset.type] ?? TYPE_META.other;
+  const ws = warrantyStatus(asset.warrantyEnd);
+  const meta = [
+    customerName,
+    typeLabel,
+    asset.site,
+    asset.location,
+    asset.serial ? `S/N ${asset.serial}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenDetails(asset)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenDetails(asset); } }}
+      className="w-full text-left px-4 py-3.5 border-b border-border active:bg-surface-raised/60 transition-colors"
+    >
+      <div className="flex items-start gap-3">
+        <div className="size-10 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0">
+          <Icon className="size-4 text-text-muted" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-text-primary leading-snug">{asset.name}</p>
+            <span className={cn(
+              'shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded',
+              asset.status === 'active'  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+              asset.status === 'spare'   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                                           'bg-surface text-text-muted border border-border',
+            )}>{asset.status}</span>
+          </div>
+          {(asset.make || asset.model) && (
+            <p className="text-xs text-text-muted mt-0.5">{[asset.make, asset.model].filter(Boolean).join(' ')}</p>
+          )}
+          <p className="text-xs text-text-secondary mt-1 line-clamp-2">{meta.join(' · ')}</p>
+          {ws && asset.warrantyEnd && (
+            <p className={cn(
+              'text-xs mt-1',
+              ws === 'expired' ? 'text-red-500 font-medium' : ws === 'soon' ? 'text-amber-500 font-medium' : 'text-text-muted',
+            )}>
+              Warranty {formatDateNo(asset.warrantyEnd)}
+              {ws === 'expired' && ' (expired)'}
+              {ws === 'soon' && ' (soon)'}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex justify-end gap-1 mt-2 -mb-1" onClick={e => e.stopPropagation()}>
+        <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset">
+          <Pencil className="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => onDelete(asset)} aria-label="Delete asset">
+          <Trash2 className="size-4 text-red-500" />
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -497,6 +588,7 @@ export function AssetsPage() {
   const [assetFormOpen, setAssetFormOpen] = useState(false);
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [addCustomerId, setAddCustomerId] = useState<string>('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const customerMap = useMemo(
     () => Object.fromEntries(customers.map(c => [c.id, c.name])),
@@ -739,9 +831,9 @@ export function AssetsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-64">
+      {/* Filters — search always visible; rest in sheet on mobile */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+        <div className="flex-1 min-w-0">
           <Input
             leftIcon={<Search className="size-3.5" />}
             placeholder="Search assets…"
@@ -751,110 +843,149 @@ export function AssetsPage() {
             onClear={() => setQuery('')}
           />
         </div>
-        <select
-          value={customerFilter}
-          onChange={e => setCustomerFilter(e.target.value)}
-          className="h-9 w-56 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+        <Button
+          variant="outline"
+          size="md"
+          className="md:hidden shrink-0"
+          leftIcon={<SlidersHorizontal className="size-4" />}
+          onClick={() => setFiltersOpen(true)}
         >
-          <option value="All">All customers</option>
-          {customers.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
-          className="h-9 w-44 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-        >
-          <option value="All">All types</option>
-          {ALL_TYPES.slice(1).map(t => (
-            <option key={t} value={t}>{TYPE_META[t as AssetType].label}</option>
-          ))}
-        </select>
-        <select
-          value={siteFilter}
-          onChange={e => setSiteFilter(e.target.value)}
-          className="h-9 w-44 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-        >
-          <option value="All">All sites</option>
-          {siteFilterOptions.hasEmpty && (
-            <option value={SITE_FILTER_NONE}>(No site)</option>
-          )}
-          {siteFilterOptions.sites.map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <div className="flex items-center gap-1.5">
-          <label className="sr-only" htmlFor="assets-sort-by">Sort by</label>
-          <select
-            id="assets-sort-by"
-            value={sortKey}
-            onChange={e => {
-              setSortKey(e.target.value as SortKey);
-              setSortDir('asc');
-            }}
-            className="h-9 w-36 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-          >
-            <option value="customer">Sort: Customer</option>
-            <option value="type">Sort: Type</option>
-            <option value="site">Sort: Site</option>
-            <option value="name">Sort: Name</option>
-            {!TOOLBAR_SORT_KEYS.includes(sortKey) && (
-              <option value={sortKey}>
-                Sort: {COLUMNS.find(c => c.key === sortKey)?.label ?? sortKey}
-              </option>
-            )}
+          Filters
+        </Button>
+        <div className="hidden md:flex flex-wrap items-center gap-3">
+          <select value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} className={cn(selectClass, 'w-56')}>
+            <option value="All">All customers</option>
+            {customers.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
           </select>
-          <button
-            type="button"
-            onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
-            className="h-9 px-2.5 rounded-lg border border-border bg-surface text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-primary-100/50 dark:hover:bg-primary-700/30 transition-colors"
-            title={sortDir === 'asc' ? 'Ascending — click for descending' : 'Descending — click for ascending'}
-            aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
-          >
-            {sortDir === 'asc' ? (
-              <ChevronUp className="size-4" />
-            ) : (
-              <ChevronDown className="size-4" />
-            )}
-          </button>
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
-          <button
-            type="button"
-            onClick={() => setStatusVisible(prev => ({ ...prev, active: !prev.active }))}
-            className={cn(
-              'h-7 px-2.5 rounded text-xs font-medium transition-colors',
-              statusVisible.active ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'text-text-muted hover:text-text-primary',
-            )}
-            title={statusVisible.active ? 'Hide active' : 'Show active'}
-          >
-            Active
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusVisible(prev => ({ ...prev, spare: !prev.spare }))}
-            className={cn(
-              'h-7 px-2.5 rounded text-xs font-medium transition-colors',
-              statusVisible.spare ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' : 'text-text-muted hover:text-text-primary',
-            )}
-            title={statusVisible.spare ? 'Hide spare' : 'Show spare'}
-          >
-            Spare
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusVisible(prev => ({ ...prev, retired: !prev.retired }))}
-            className={cn(
-              'h-7 px-2.5 rounded text-xs font-medium transition-colors',
-              statusVisible.retired ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'text-text-muted hover:text-text-primary',
-            )}
-            title={statusVisible.retired ? 'Hide retired' : 'Show retired'}
-          >
-            Retired
-          </button>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={cn(selectClass, 'w-44')}>
+            <option value="All">All types</option>
+            {ALL_TYPES.slice(1).map(t => (
+              <option key={t} value={t}>{TYPE_META[t as AssetType].label}</option>
+            ))}
+          </select>
+          <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)} className={cn(selectClass, 'w-44')}>
+            <option value="All">All sites</option>
+            {siteFilterOptions.hasEmpty && <option value={SITE_FILTER_NONE}>(No site)</option>}
+            {siteFilterOptions.sites.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-1.5">
+            <label className="sr-only" htmlFor="assets-sort-by">Sort by</label>
+            <select
+              id="assets-sort-by"
+              value={sortKey}
+              onChange={e => { setSortKey(e.target.value as SortKey); setSortDir('asc'); }}
+              className={cn(selectClass, 'w-36')}
+            >
+              <option value="customer">Sort: Customer</option>
+              <option value="type">Sort: Type</option>
+              <option value="site">Sort: Site</option>
+              <option value="name">Sort: Name</option>
+              {!TOOLBAR_SORT_KEYS.includes(sortKey) && (
+                <option value={sortKey}>Sort: {COLUMNS.find(c => c.key === sortKey)?.label ?? sortKey}</option>
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
+              className="h-11 md:h-9 px-2.5 rounded-lg border border-border bg-surface text-text-secondary hover:text-text-primary"
+              aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+            >
+              {sortDir === 'asc' ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            </button>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+            {(['active', 'spare', 'retired'] as const).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusVisible(prev => ({ ...prev, [s]: !prev[s] }))}
+                className={cn(
+                  'h-9 md:h-7 px-2.5 rounded text-xs font-medium transition-colors capitalize',
+                  statusVisible[s]
+                    ? s === 'active' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                      : s === 'spare' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                    : 'text-text-muted hover:text-text-primary',
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filters & sort">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Customer</label>
+            <select value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} className={selectClass}>
+              <option value="All">All customers</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Type</label>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={selectClass}>
+              <option value="All">All types</option>
+              {ALL_TYPES.slice(1).map(t => (
+                <option key={t} value={t}>{TYPE_META[t as AssetType].label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Site</label>
+            <select value={siteFilter} onChange={e => setSiteFilter(e.target.value)} className={selectClass}>
+              <option value="All">All sites</option>
+              {siteFilterOptions.hasEmpty && <option value={SITE_FILTER_NONE}>(No site)</option>}
+              {siteFilterOptions.sites.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-text-secondary">Sort by</label>
+            <div className="flex gap-2">
+              <select
+                value={sortKey}
+                onChange={e => { setSortKey(e.target.value as SortKey); setSortDir('asc'); }}
+                className={cn(selectClass, 'flex-1')}
+              >
+                <option value="customer">Customer</option>
+                <option value="type">Type</option>
+                <option value="site">Site</option>
+                <option value="name">Name</option>
+              </select>
+              <Button variant="outline" size="icon" onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} aria-label="Toggle sort direction">
+                {sortDir === 'asc' ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-text-secondary">Status</p>
+            <div className="flex flex-wrap gap-2">
+              {(['active', 'spare', 'retired'] as const).map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusVisible(prev => ({ ...prev, [s]: !prev[s] }))}
+                  className={cn(
+                    'h-10 px-3 rounded-lg text-sm font-medium capitalize border border-border',
+                    statusVisible[s] ? 'bg-accent/15 text-accent border-accent/30' : 'text-text-muted',
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Button variant="primary" className="w-full" onClick={() => setFiltersOpen(false)}>
+            Apply
+          </Button>
+        </div>
+      </Sheet>
 
       {/* Table */}
       <Card>
@@ -862,7 +993,7 @@ export function AssetsPage() {
           title="All Assets"
           subtitle={`${filtered.length} of ${assets.length} assets · sorted by ${COLUMNS.find(c => c.key === sortKey)?.label ?? sortKey} (${sortDir})`}
         />
-        <CardBody className="p-0 overflow-x-auto">
+        <CardBody className="p-0">
           {loading ? (
             <div className="p-4 space-y-2 animate-pulse">
               {[1,2,3,4,5].map(i => <div key={i} className="skeleton h-10 rounded" />)}
@@ -874,6 +1005,20 @@ export function AssetsPage() {
                 : 'No assets match your filters.'}
             </p>
           ) : (
+            <>
+            <div className="md:hidden divide-y divide-border">
+              {filtered.map(a => (
+                <AssetMobileCard
+                  key={a.id}
+                  asset={a}
+                  customerName={customerMap[a.customerId] ?? 'Unknown'}
+                  onOpenDetails={handleOpenDetails}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <ResizableColGroup columns={assetsCols as unknown as Array<{ key: string }>} widths={colWidths} />
               <thead>
@@ -903,9 +1048,10 @@ export function AssetsPage() {
                       onSort={handleSort}
                       widths={colWidths}
                       onResize={setColWidth}
+                      thClassName={ASSET_TH_CLASS[k]}
                     />
                   ))}
-                  <ResizableTh colKey="actions" widths={colWidths} onResize={setColWidth} className="text-right">
+                  <ResizableTh colKey="actions" widths={colWidths} onResize={setColWidth} className="text-right w-[5.5rem]">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                       Actions
                     </span>
@@ -926,6 +1072,8 @@ export function AssetsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
+            </>
           )}
         </CardBody>
       </Card>
@@ -935,7 +1083,7 @@ export function AssetsPage() {
 
       {/* Add asset → pick customer */}
       {addPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4">
           <div className="absolute inset-0" onClick={() => setAddPickerOpen(false)} />
           <div className="relative z-10 w-full max-w-lg bg-surface-raised border border-border rounded-card shadow-modal">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -983,9 +1131,9 @@ export function AssetsPage() {
 
       {/* Asset detail drawer */}
       {selectedAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-0 sm:px-4">
           <div className="absolute inset-0" onClick={() => setSelectedAsset(null)} />
-          <aside className="relative z-10 w-full max-w-2xl max-h-[90vh] bg-surface-raised border border-border rounded-card flex flex-col shadow-modal">
+          <aside className="relative z-10 w-full max-w-2xl max-h-[min(92dvh,100%)] bg-surface-raised border border-border rounded-t-2xl sm:rounded-card flex flex-col shadow-modal pb-[env(safe-area-inset-bottom,0px)]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h3 className="text-base font-semibold text-text-primary truncate pr-4">{selectedAsset.name}</h3>
               <Button variant="ghost" size="icon" onClick={() => setSelectedAsset(null)} aria-label="Close">

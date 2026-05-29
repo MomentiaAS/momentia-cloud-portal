@@ -31,7 +31,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -46,8 +46,9 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
       {/* Panel */}
       <div
         className={cn(
-          'relative z-10 w-full bg-surface-raised border border-border rounded-xl shadow-popover',
-          'flex flex-col max-h-[90dvh]',
+          'relative z-10 w-full bg-surface-raised border border-border shadow-popover',
+          'flex flex-col max-h-[min(92dvh,100%)] rounded-t-2xl sm:rounded-xl',
+          'pb-[env(safe-area-inset-bottom,0px)]',
           sizeMap[size],
         )}
       >
